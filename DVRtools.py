@@ -36,7 +36,7 @@ def wfn_flipper(wavefunctions_array, plotPhasedWfns=False, pot_array=None):
     return wfns
 
 
-def ohWfn_plots(dvr_results, wfns2plt=3, **kwargs):
+def ohWfn_plots(dvr_results, wfns2plt=3, degree=None, **kwargs):
     import matplotlib.pyplot as plt
     import numpy as np
     potz = dvr_results[0]
@@ -45,16 +45,21 @@ def ohWfn_plots(dvr_results, wfns2plt=3, **kwargs):
     degrees = eps[:, 0]
     colors = ["royalblue", "crimson", "violet", "orchid", "plum", "hotpink"]
     for i, j in enumerate(degrees):
-        if j == 40 or j == 170 or j == 270:
-            # plt.rcParams.update({'font.size': 20})
-            # plt.figure(figsize=(6, 6), dpi=300)
-            plt.plot(potz[i, :, 0], potz[i, :, 1], '-k', linewidth=3.0)
-            # minIdx = np.argmin(potz[i, :, 1])
-            # print(f"{j} min : {potz[i, minIdx, 0]}")
-            for k in range(wfns2plt):
-                plt.plot(potz[i, :, 0], (wfns[i, :, k] * 8000) + eps[i, (k + 1)], colors[k], linewidth=2.0)
+        # plt.rcParams.update({'font.size': 20})
+        # plt.figure(figsize=(6, 6), dpi=300)
+        plt.plot(potz[i, :, 0], potz[i, :, 1], '-k', linewidth=3.0)
+        # minIdx = np.argmin(potz[i, :, 1])
+        # print(f"{j} min : {potz[i, minIdx, 0]}")
+        for k in range(wfns2plt):
+            plt.plot(potz[i, :, 0], (wfns[i, :, k] * 8000) + eps[i, (k + 1)], colors[k], linewidth=2.0)
+        if j > 1:
             plt.title(f"{j} Degrees")
-            plt.ylim(0, 30000)
-            plt.tight_layout()
-            plt.show()
-            plt.close()
+        else:
+            if degree is not None:
+                plt.title(f"{degree} Degrees {j} Step size")
+            else:
+                plt.title(f"{j} Step Size")
+        plt.ylim(0, 30000)
+        plt.tight_layout()
+        plt.show()
+        plt.close()

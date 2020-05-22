@@ -1,13 +1,10 @@
 import numpy as np
 from PyDVR import *
-from McUtils import *
 from DVRtools import *
 
-def formatData(Rmins_file, Renergies_file, step=0.02):
+def formatData(Rmins_file, Renergies_file, addMins=False, step=0.02):
     Rmins = np.loadtxt(Rmins_file)
     Renergies = np.loadtxt(Renergies_file, skiprows=1)
-    # load in min points
-    minE = np.loadtxt("mins-ens.txt")
     datDict = dict()
     for i in range(len(Rmins)):
         # create min array, given start (Rmins[i, 1]), step size 0.02, and len
@@ -15,17 +12,51 @@ def formatData(Rmins_file, Renergies_file, step=0.02):
         x = np.arange(Rmins[i, 1], maxi, step)
         x = x[:len(Renergies[:, i])]
         cut = np.column_stack((x, Renergies[:, i]))
-        cut = np.vstack((minE[i, 1:], cut))
-        idx = np.argsort(cut[:, 0])
-        cut_sort = cut[idx, :]
-        cut_sort[:, 0] = np.around(cut_sort[:, 0], 5)
-        u, u_idx = np.unique(cut_sort[:, 0], return_index=True)
-        u_sort = cut_sort[u_idx, :]
-        datDict[Rmins[i, 0]] = u_sort
+        if addMins:
+            minE = np.loadtxt("mins-ens.txt")  # load in min points
+            cut = np.vstack((minE[i, 1:], cut))
+            idx = np.argsort(cut[:, 0])
+            cut_sort = cut[idx, :]
+            cut_sort[:, 0] = np.around(cut_sort[:, 0], 5)
+            u, u_idx = np.unique(cut_sort[:, 0], return_index=True)
+            u_sort = cut_sort[u_idx, :]
+            finalCut = u_sort
+        else:
+            finalCut = cut
+        datDict[Rmins[i, 0]] = finalCut
     # data in degrees: angstroms/hartrees
     return datDict
 
-def run_anharOH_DVR(cut_dict, NumPts=500, desiredEnergies=3, plotPhasedWfns=False):
+def formatvaryingstepData(Renergies_file, mins, steps, minpoint, addMins=True):
+    datDict = dict()
+    RenergiesFull = np.loadtxt(f"{Renergies_file}_0.005.txt")
+    for i in range(len(steps)):
+        # create min array, given start mins, steps, and len
+        # Renergies = np.loadtxt(f"{Renergies_file}_{steps[i]}.txt")
+        if steps[i] == 0.02:
+            Renergies = RenergiesFull[::4]
+        elif steps[i] == 0.01:
+            Renergies = RenergiesFull[::2]
+        else:
+            Renergies = RenergiesFull
+        maxi = mins[i] + (steps[i]*len(Renergies))
+        x = np.arange(mins[i], maxi, steps[i])
+        x = x[:len(Renergies)]
+        cut = np.column_stack((x, Renergies))
+        if addMins:
+            cut = np.vstack((minpoint, cut))
+            idx = np.argsort(cut[:, 0])
+            cut_sort = cut[idx, :]
+            cut_sort[:, 0] = np.around(cut_sort[:, 0], 5)
+            u, u_idx = np.unique(cut_sort[:, 0], return_index=True)
+            u_sort = cut_sort[u_idx, :]
+            finalCut = u_sort
+        else:
+            finalCut = cut
+        datDict[steps[i]] = finalCut
+    return datDict
+
+def run_anharOH_DVR(cut_dict, NumPts=1000, desiredEnergies=3, plotPhasedWfns=False):
     """ Runs anharmonic DVR over the OH coordinate at every degree value."""
     from Converter import Constants, Potentials1D
     dvr_1D = DVR("ColbertMiller1D")
@@ -39,6 +70,7 @@ def run_anharOH_DVR(cut_dict, NumPts=500, desiredEnergies=3, plotPhasedWfns=Fals
 
     for j, n in enumerate(cut_dict):
         x = Constants.convert(cut_dict[n][:, 0], "angstroms", to_AU=True)
+        print(len(x))
         mini = min(x) - 0.3
         maxi = max(x) + 0.3
         en = cut_dict[n][:, 1] - np.min(cut_dict[n][:, 1])
@@ -71,12 +103,23 @@ def calcFreqs(epsilonPots):
     return freqs  # this is frequencies.txt
 
 if __name__ == '__main__':
-    RminsFN = "Rmin_degreeScans.txt"
-    RenergiesFN = "Energies_degreeScans.txt"
-    dat = formatData(RminsFN, RenergiesFN)
-    res = run_anharOH_DVR(dat)
-    # np.savetxt("frequencies.txt", calcFreqs(res[1]))
-    # ohWfn_plots(res)
-    # np.savetxt("potentials.txt", res[0])
-    # np.savetxt("energies.txt", res[1])
-    # np.savetxt("wavefunctions.txt", res[2])
+    # RminsTBHP = "Rmins_TBHP.txt"
+    # RenergiesTBHP = "Energies_TBHP.txt"
+    # dat = formatData(RminsTBHP, RenergiesTBHP)
+    # res = run_anharOH_DVR(dat)
+
+    minsTest90 = [0.75078, 0.75078, 0.75078]
+    minsTest180 = [0.75905, 0.75905, 0.75905]
+    minsTest270 = [0.75104, 0.75104, 0.75104]
+    stepsTest = [0.02, 0.01, 0.005]
+    energiesFN90 = "Energies_QOOH_90"
+    energiesFN180 = "Energies_QOOH_180"
+    energiesFN270 = "Energies_QOOH_270"
+    min90 = [0.9657800000000002, -308.0062614]
+    min180 = [0.9640500000000002, -308.0055606]
+    min270 = [0.9660400000000002, -308.0078036]
+    data = formatvaryingstepData(energiesFN270, minsTest270, stepsTest, min270)
+    resu = run_anharOH_DVR(data)
+    np.savetxt("frequencies_QOOH_270.txt", calcFreqs(resu[1]))
+    # ohWfn_plots(resu, degree=90)
+    np.savetxt("energies_QOOH_270.txt", resu[1])
