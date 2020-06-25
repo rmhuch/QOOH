@@ -101,28 +101,27 @@ def calcFreqs(epsilonPots):
         freqs[i, :] = [epsilonPots[i, 0], E10, E20, omega_x, omega]
     return freqs  # this is frequencies.txt
 
+def plotadiabats(dvr_res):
+    import matplotlib.pyplot as plt
+    from scaledCoefs import pull_Eldata
+    from Converter import Constants
+    eldat = pull_Eldata(TBHPdir)
+    el = Constants.convert(eldat[:, 1], "wavenumbers", to_AU=False)
+    epsilonPots = dvr_res[1]
+    for i in np.arange(1, epsilonPots.shape[1]):  # loop through saved energies
+        plt.plot(epsilonPots[:, 0], epsilonPots[:, i] + el)
+    plt.show()
+
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     TBHPdir = os.path.join(udrive, "TBHP")
     RminsTBHP = "Rmins_TBHP.txt"
-    RenergiesTBHP = "Energies_TBHP.txt"
+    RenergiesTBHP = "Energies_TBHP_extended.txt"
     dat = formatData(os.path.join(TBHPdir, RminsTBHP), os.path.join(TBHPdir, RenergiesTBHP))
-    res = run_anharOH_DVR(dat)
-    np.savetxt(os.path.join(TBHPdir, "frequenciesDVR_TBHP.txt"), calcFreqs(res[1]))
-    np.savetxt(os.path.join(TBHPdir, "energiesDVR_TBHP.txt"), res[1])
+    res = run_anharOH_DVR(dat, desiredEnergies=7, NumPts=1500)
+    # plotadiabats(res)
+    # print(calcFreqs(res[1]))
+    ohWfn_plots(res, wfns2plt=4)
+    # np.savetxt(os.path.join(TBHPdir, "frequenciesDVR_TBHP.txt"), calcFreqs(res[1]))
+    # np.savetxt(os.path.join(TBHPdir, "energiesDVR_TBHP_extended2000.txt"), res[1])  # in wavenumbers..
 
-    # minsTest90 = [0.75078, 0.75078, 0.75078]
-    # minsTest180 = [0.75905, 0.75905, 0.75905]
-    # minsTest270 = [0.75104, 0.75104, 0.75104]
-    # stepsTest = [0.02, 0.01, 0.005]
-    # energiesFN90 = "Energies_QOOH_90"
-    # energiesFN180 = "Energies_QOOH_180"
-    # energiesFN270 = "Energies_QOOH_270"
-    # min90 = [0.9657800000000002, -308.0062614]
-    # min180 = [0.9640500000000002, -308.0055606]
-    # min270 = [0.9660400000000002, -308.0078036]
-    # data = formatvaryingstepData(energiesFN270, minsTest270, stepsTest, min270)
-    # resu = run_anharOH_DVR(data)
-    # np.savetxt("frequencies_QOOH_270.txt", calcFreqs(resu[1]))
-    # # ohWfn_plots(resu, degree=90)
-    # np.savetxt("energies_QOOH_270.txt", resu[1])
