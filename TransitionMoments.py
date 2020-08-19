@@ -93,24 +93,11 @@ def plot_interpDW(dirname, Rmins_fn, Renergies_fn, npz_fn=None, eqdip_fn=None, d
 def calc_TDM(dipoles, ohWfns, transition="0 -> 1"):
     """calculates the transition moment at each degree value. Returns the TDM at each degree"""
     mus = np.zeros((len(dipoles), 3))
-    if transition == "0 -> 1":
-        Exlevel = 1
-    elif transition == "0 -> 2":
-        Exlevel = 2
-    elif transition == "0 -> 3":
-        Exlevel = 3
-    elif transition == "0 -> 4":
-        Exlevel = 4
-    elif transition == "0 -> 5":
-        Exlevel = 5
-    elif transition == "0 -> 6":
-        Exlevel = 6
-
-    else:
-        raise Exception("Sorry, I don't know that transition")
+    Glevel = int(transition[0])
+    Exlevel = int(transition[-1])
     for k in np.arange(len(dipoles)):  # loop through degree values
         for j in np.arange(3):  # loop through x, y, z
-            gs_wfn = ohWfns[k, :, 0].T
+            gs_wfn = ohWfns[k, :, Glevel].T
             es_wfn = ohWfns[k, :, Exlevel].T
             es_wfn_t = es_wfn.reshape(-1, 1)
             soup = np.diag(dipoles[k, :, j]).dot(es_wfn_t)
@@ -174,32 +161,47 @@ def calc_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None
                                size=size, transition=transition)
     torWfn_coefs, torEnergies = run_FE(barrier_height=barrier_height)
     # print(Constants.convert(torEnergies["res4"][:10], "wavenumbers", to_AU=False))
-    if transition == "0 -> 1":
-        Exlevel = "res1"
-    elif transition == "0 -> 2":
-        Exlevel = "res2"
-    elif transition == "0 -> 3":
-        Exlevel = "res3"
-    elif transition == "0 -> 4":
-        Exlevel = "res4"
-    elif transition == "0 -> 5":
-        Exlevel = "res5"
-    elif transition == "0 -> 6":
-        Exlevel = "res6"
-    else:
-        raise Exception("Sorry, I don't know that transition")
+    Glevel = f"res{transition[0]}"
+    Exlevel = f"res{transition[-1]}"
     intensities = []
     for gState in np.arange(4):
         for exState in np.arange(4):
-            freq = torEnergies[Exlevel][exState] - torEnergies["res0"][gState]
+            freq = torEnergies[Exlevel][exState] - torEnergies[Glevel][gState]
             freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
             print("\n")
             print(f"OH - {transition}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
             comp_intents = np.zeros(3)
             for c, val in enumerate(["A", "B", "C"]):  # loop through components
                 supere = np.dot(TDM_mats[c, :, :], torWfn_coefs[Exlevel][:, exState].T)
-                matEl = np.dot(torWfn_coefs["res0"][:, gState], supere)
+                matEl = np.dot(torWfn_coefs[Glevel][:, gState], supere)
                 comp_intents[c] = (abs(matEl) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)
+                print(f"{val} : {comp_intents[c]:.8f} km/mol")
+            print(f"total : {np.sum(comp_intents):.6f}")
+            if comp_intents[1] > 1E-10:
+                ratio = comp_intents[1] / comp_intents[2]
+                print(f"B/C ratio : {ratio:.4f}")
+            intensities.append([gState, exState, freq_wave, np.sum(comp_intents)])
+    return intensities  # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol)]
+
+def calc_2intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None, npz_fn=None,
+                    size=15, transition="2 -> 4", barrier_height=None):
+    TDM_mats = calc_TDM_matrix(dirname, Rmins_fn, Renergies_fn, eqdip_fn, deriv_fn, npz_fn,
+                               size=size, transition=transition)
+    torWfn_coefs, torEnergies = run_FE(barrier_height=barrier_height)
+    Glevel = f"res{transition[0]}"
+    Exlevel = f"res{transition[-1]}"
+    intensities = []
+    for gState in np.arange(2):
+        for exState in np.arange(11):
+            freq = torEnergies[Exlevel][exState] - torEnergies[Glevel][gState]
+            freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
+            print("\n")
+            print(f"OH - {transition}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
+            comp_intents = np.zeros(3)
+            for c, val in enumerate(["A", "B", "C"]):  # loop through components
+                supere = np.dot(TDM_mats[c, :, :], torWfn_coefs[Exlevel][:, exState].T)
+                matEl = np.dot(torWfn_coefs[Glevel][:, gState], supere)
+                comp_intents[c] = (abs(matEl) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)  # convert to km/mol
                 print(f"{val} : {comp_intents[c]:.8f} km/mol")
             print(f"total : {np.sum(comp_intents):.6f}")
             if comp_intents[1] > 1E-10:
@@ -217,12 +219,7 @@ def calc_stat_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn
     degrees = np.linspace(0, 360, len(mus))
     resEl, results = run()
     OH_0coefs = results[0]["V"]
-    if transition == "0 -> 1":
-        OH_excoefs = results[1]["V"]
-    elif transition == "0 -> 2":
-        OH_excoefs = results[2]["V"]
-    else:
-        raise Exception("Sorry, I don't know that transition")
+    OH_excoefs = results[int(transition[-1])]["V"]
     intensity = np.zeros((len(values), 3))
     for i, value in enumerate(values):
         idx = np.argwhere(degrees == value)[0][0]
@@ -232,7 +229,7 @@ def calc_stat_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn
         freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
         print(f"Stationary Frequency : {freq_wave}")
         for c, val in enumerate(["A", "B", "C"]):  # loop through components
-            intensity[i, c] = (abs(mus[idx, c]))**2 * freq_wave * 2.506 / (0.393456 ** 2)
+            intensity[i, c] = (abs(mus[idx, c]))**2 * freq_wave * 2.506 / (0.393456 ** 2)  # convert to km/mol
             print(f"Stationary Intensity @ {value} {val} : {intensity[i, c]}")
     return intensity
 
@@ -275,12 +272,12 @@ if __name__ == '__main__':
     RenergiesTBHP = "Energies_TBHP_extended.txt"
     eqdipsTBHP = "ek_dip.dat"
     dipDerivsTBHP = "ekOHDerivs.dat"
-    # g, wfns, dips = interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
-    # plot_interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
+    g, wfns, dips = interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
+    plot_interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
     # plot_TDM(dips, wfns, transition="0 -> 2")
-    # calc_intensity(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz", transition="0 -> 4")
+    # calc_2intensity(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz", transition="2 -> 4")
     # v = list(np.arange(0, 370, 10))
     # plot_stat_intensity(TBHPdir, RminsTBHP, RenergiesTBHP, eqdip_fn=eqdipsTBHP, deriv_fn=dipDerivsTBHP,
     #                     transition="0 -> 2", values=v)
-    bhs = list(np.arange(250, 375, 25))
-    tor_freq_plot(TBHPdir, RminsTBHP, RenergiesTBHP, bhs, npz_fn="rotated_dipoles.npz", transition="0 -> 4")
+    # bhs = list(np.arange(250, 375, 25))
+    # tor_freq_plot(TBHPdir, RminsTBHP, RenergiesTBHP, bhs, npz_fn="rotated_dipoles.npz", transition="0 -> 4")

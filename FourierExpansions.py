@@ -167,7 +167,7 @@ def run(plots=False):
         Vi = coefDict["Vel"] + coefDict[f"V{i-1}"]
         results.append(calcEns(Vi, coefDict["Bel"], HamSize=15))
     if plots:
-        make_plots(results, wfns=False, levels=True, title="Excitation of OH Unscaled")
+        make_plots(results, wfns=True, levels=False, title="Excitation of OH Unscaled")
     return res, results  # returns electronic energies and list of results of higher values
 
 def run_Scaling(barrier_height=275, plots=False):
@@ -193,4 +193,4 @@ def run_Scaling(barrier_height=275, plots=False):
 
 if __name__ == '__main__':
     # run(plots=True)
-    run_Scaling(barrier_height=275, plots=True)
+    run(plots=True)

@@ -60,7 +60,7 @@ def sin_func(x, c0, c1, c2, c3, c4, c5, c6):
     return c0 + c1*np.sin(x) + c2*np.sin(2*x) + c3*np.sin(3*x) + c4*np.sin(4*x) + c5*np.sin(5*x) + c6*np.sin(6*x)
 
 def calc_sin_coefs(energy_dat):
-    """conducts a cos expansion to fit the energy curve given, returns sixth order coefs."""
+    """conducts a sin expansion to fit the energy curve given, returns sixth order coefs."""
     popt, pcov = optimize.curve_fit(sin_func, energy_dat[:, 0], energy_dat[:, 1])
     return popt
 
