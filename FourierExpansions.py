@@ -142,35 +142,33 @@ def make_plots(resDicts, levels=False, wfns=True, title=None):
         print(en0, en1, en2, en3)
         if levels:
             enX = np.linspace(np.pi/3, 2*np.pi - np.pi/3, 10)
-            plt.plot(enX, np.repeat(en0, len(enX)), "-C0", label=f"{en0}")
-            plt.plot(enX, np.repeat(en1, len(enX)), "-C1", label=f"{en1}")
-            plt.plot(enX, np.repeat(en2, len(enX)), "-C2", label=f"{en2}")
-            plt.plot(enX, np.repeat(en3, len(enX)), "-C3", label=f"{en3}")
+            plt.plot(enX, np.repeat(en0, len(enX)), "-r", label=f"{en0}")
+            plt.plot(enX, np.repeat(en1, len(enX)), "-b", label=f"{en1}")
+            plt.plot(enX, np.repeat(en2, len(enX)), "-g", label=f"{en2}")
+            plt.plot(enX, np.repeat(en3, len(enX)), color="indigo", label=f"{en3}")
         if wfns:
             wfnns = PORwfns(resDict["eigvecs"], x)
-            plt.plot(x, en0 + wfnns[:, 0]*100, "-C0", label=f"{en0:.2f}")
-            plt.plot(x, en1 + wfnns[:, 1]*100, "-C1", label=f"{en1:.2f}")
-            plt.plot(x, en2 + wfnns[:, 2]*100, "-C2", label=f"{en2:.2f}")
-            plt.plot(x, en3 + wfnns[:, 3]*100, "-C3", label=f"{en3:.2f}")
+            plt.plot(x, en0 + wfnns[:, 0]*100, "-r", label=f"{en0:.2f}")
+            plt.plot(x, en1 + wfnns[:, 1]*100, "-b", label=f"{en1:.2f}")
+            plt.plot(x, en2 + wfnns[:, 2]*100, "-g", label=f"{en2:.2f}")
+            plt.plot(x, en3 + wfnns[:, 3]*100, color="indigo", label=f"{en3:.2f}")
 
     plt.title(title)
     # plt.legend()
     plt.show()
-
-def run(plots=False):
+    
+def run(levs_to_calc=7):
     dvvr = "energiesDVR_TBHP_extended1500.txt"
-    coefDict = pull_DVR_data(TBHPdir, dvvr)
+    coefDict = pull_DVR_data(TBHPdir, dvvr, levs_to_calc=levs_to_calc)
     # coefDict = pullCoefs(TBHPdir)
     res = calcEns(coefDict["Vel"], coefDict["Bel"], HamSize=15)  # converged (15-50)
     results = []
     for i in np.arange(1, len(coefDict.keys())-1):  # loop through saved energies
         Vi = coefDict["Vel"] + coefDict[f"V{i-1}"]
         results.append(calcEns(Vi, coefDict["Bel"], HamSize=15))
-    if plots:
-        make_plots(results, wfns=True, levels=False, title="Excitation of OH Unscaled")
     return res, results  # returns electronic energies and list of results of higher values
 
-def run_Scaling(barrier_height=275, plots=False):
+def run_Scaling(barrier_height=275):
     dat = pull_Eldata(TBHPdir)  # pull electronic energy data as per scaledCoefs
     dvvr = "energiesDVR_TBHP_extended1500.txt"
     coefDict = pull_DVR_data(TBHPdir, dvvr)
@@ -178,19 +176,13 @@ def run_Scaling(barrier_height=275, plots=False):
     sf, scaled_dat = scale_barrier(dat, barrier_height=barrier_height)
     scaled_ELcoefs = calc_coefs(scaled_dat)
     coefDict["scaledVel"] = scaled_ELcoefs
-    if plots:
-        all_scaledcoeffs = make_scaledPots(coefDict, barrier_height=barrier_height, makeplot=True)
-    else:
-        all_scaledcoeffs = make_scaledPots(coefDict, barrier_height=barrier_height)
+    all_scaledcoeffs = make_scaledPots(coefDict, barrier_height=barrier_height)
     results = []
     for i in np.arange(len(all_scaledcoeffs)):  # loop through scaled coefficients
         Vi = all_scaledcoeffs[i]
         results.append(calcEns(Vi, coefDict["Bel"], HamSize=15))
-    if plots:
-        make_plots(results, wfns=True, levels=False, title=f"Excitation of OH Scaled = {sf:.4f}")
     return results  # calc resEL too ?
 
 
 if __name__ == '__main__':
-    # run(plots=True)
-    run(plots=True)
+    run(levs_to_calc=3)

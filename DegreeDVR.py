@@ -118,10 +118,10 @@ if __name__ == '__main__':
     RminsTBHP = "Rmins_TBHP.txt"
     RenergiesTBHP = "Energies_TBHP_extended.txt"
     dat = formatData(os.path.join(TBHPdir, RminsTBHP), os.path.join(TBHPdir, RenergiesTBHP))
-    res = run_anharOH_DVR(dat, desiredEnergies=7, NumPts=1500)
+    res = run_anharOH_DVR(dat, desiredEnergies=3, NumPts=1500)
     # plotadiabats(res)
     # print(calcFreqs(res[1]))
-    ohWfn_plots(res, wfns2plt=4)
+    # ohWfn_plots(res, wfns2plt=4)
     # np.savetxt(os.path.join(TBHPdir, "frequenciesDVR_TBHP.txt"), calcFreqs(res[1]))
     # np.savetxt(os.path.join(TBHPdir, "energiesDVR_TBHP_extended2000.txt"), res[1])  # in wavenumbers..
 

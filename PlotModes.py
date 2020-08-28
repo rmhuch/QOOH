@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Converter import Constants
 
+params = {'text.usetex': False,
+          'mathtext.fontset': 'dejavusans',
+          'font.size': 14}
+plt.rcParams.update(params)
+
 def loadModeData(mode, freqdir, modedir):
     x = mode
     f = []
@@ -23,12 +28,12 @@ def plot_OOfreqsAC(data):
         else:
             pass
     # plt.ylim(500, 2000)
-    plt.ylabel("OO Stretch Frequency (wavenumbers)")
-    plt.xlabel("rOH (angstroms)")
+    plt.ylabel(r"OO Stretch Frequency (cm$^{-1}$)")
+    plt.xlabel(r"rOH $\AA$")
     plt.legend()
     plt.show()
 
-def plot_OOvsrOH(data, vals, modedir):
+def plot_OOvsrOH(data, vals, modedir, filename=None):
     from CalcModeContributions import OOContribs
     rOH = np.arange(0.96568, 1.76568, 0.1)
     contribDict = OOContribs(vals, modedir)
@@ -50,21 +55,27 @@ def plot_OOvsrOH(data, vals, modedir):
     one = np.array(one)
     two = np.array(two)
     three = np.array(three)
-    plt.subplot(212)
-    plt.plot(one[:, 0], one[:, 3], "ro")
-    plt.plot(two[:, 0], two[:, 3], "bo")
-    plt.plot(three[:, 0], three[:, 3], "go")
-    plt.ylabel("OO Stretch Frequency (wavenumbers)")
-    plt.xlabel("rOH (angstroms)")
-    plt.subplot(211)
-    plt.plot(one[:, 0], one[:, 2], "ro")
-    plt.plot(two[:, 0], two[:, 2], "bo")
-    plt.plot(three[:, 0], three[:, 2], "go")
-    plt.ylabel("OO Stretch Contribution")
-    plt.xlabel("rOH (angstroms)")
-    plt.show()
+    f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
+    ax2.plot(one[:, 0], one[:, 3], "ro")
+    ax2.plot(two[:, 0], two[:, 3], "bo")
+    ax2.plot(three[:, 0], three[:, 3], "go")
+    ax2.axes.set_ylim(850, 975)
+    ax2.axes.set_ylabel(r"OO Stretch Frequency (cm$^{-1}$)")
+    ax2.axes.set_xlabel(r"rOH ($\AA$)")
 
-def plot_OOHvsrOH(data, vals, modedir):
+    ax.plot(one[:, 0], one[:, 2], "ro")
+    ax.plot(two[:, 0], two[:, 2], "bo")
+    ax.plot(three[:, 0], three[:, 2], "go")
+    ax.tick_params(labelbottom=True)
+    ax.axes.set_ylim(30, 100)
+    ax.axes.set_ylabel("OO Stretch Contribution (%)")
+    ax.axes.set_xlabel(r"rOH ($\AA$)")
+    if filename is None:
+        f.show()
+    else:
+        f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
+
+def plot_OOHvsrOH(data, vals, modedir, filename=None):
     from CalcModeContributions import OOHContribs
     rOH = np.arange(0.96568, 1.76568, 0.1)
     contribDict = OOHContribs(vals, modedir)
@@ -80,17 +91,49 @@ def plot_OOHvsrOH(data, vals, modedir):
             one.append([x, int(modes[0]), (contribDict[val][0, 1]*100), freqs[i, int(modes[0])]])
     one = np.array(one)
     two = np.array(two)
-    plt.subplot(212)
-    plt.plot(one[:, 0], one[:, 3], "ro")
-    plt.plot(two[:, 0], two[:, 3], "bo")
-    plt.ylabel("OOH Bend Frequency (wavenumbers)")
-    plt.xlabel("rOH (angstroms)")
-    plt.subplot(211)
-    plt.plot(one[:, 0], one[:, 2], "ro")
-    plt.plot(two[:, 0], two[:, 2], "bo")
-    plt.ylabel("OOH Bend Contribution (%)")
-    plt.xlabel("rOH (angstroms)")
-    plt.show()
+
+    f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
+    ax2.plot(one[:, 0], one[:, 3], "ro")
+    ax2.plot(two[:, 0], two[:, 3], "bo")
+    ax2.axes.set_ylim(1050, 1575)
+    ax2.axes.set_ylabel(r"OOH Bend Frequency (cm$^{-1}$)")
+    ax2.axes.set_xlabel(r"rOH ($\AA$)")
+
+    ax.plot(one[:, 0], one[:, 2], "ro")
+    ax.plot(two[:, 0], two[:, 2], "bo")
+    ax.tick_params(labelbottom=True)
+    ax.axes.set_ylim(30, 100)
+    ax.axes.set_ylabel("OOH Bend Contribution (%)")
+    ax.axes.set_xlabel(r"rOH ($\AA$)")
+    if filename is None:
+        f.show()
+    else:
+        f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
+
+def plot_HarmonicZPEvsrOH(data, potfile, filename=None):
+    pot_dat = np.loadtxt(potfile)
+    rOH = pot_dat[:, 0]
+    freqs = data[1]
+    plot_dat = []
+    for i, x in enumerate(rOH):
+        y = np.sum(freqs[i, :])/2 - np.sum(freqs[0, :])/2
+        plot_dat.append([x, y])
+    plot_dat = np.array(plot_dat)
+
+    f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
+    ax2.plot(plot_dat[:, 0], plot_dat[:, 1], "o", color="indigo")
+    ax2.axes.set_ylabel(r"Change in Harmonic ZPE (cm$^{-1}$)")
+    ax2.axes.set_xlabel(r"rOH ($\AA$)")
+
+    ax.plot(rOH, pot_dat[:, 1], "o", color="indigo")
+    ax.tick_params(labelbottom=True)
+    ax.axes.set_ylabel(r"Potential Energy (cm$^{-1}$)")
+    ax.axes.set_xlabel(r"rOH ($\AA$)")
+    if filename is None:
+        f.show()
+    else:
+        f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
+
 
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -102,4 +145,7 @@ if __name__ == '__main__':
     OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
 
     dat = loadModeData(OHvals, OHfreqdir, OHmodedir)
-    plot_OOvsrOH(dat, OHvals, OHmodedir)
+    potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
+    plot_OOvsrOH(dat, OHvals, OHmodedir, filename="OOFreqsvsrOH")
+    plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH")
+    plot_OOHvsrOH(dat, OHvals, OHmodedir, filename="OOHFreqsvsrOH")

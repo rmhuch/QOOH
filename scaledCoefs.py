@@ -14,7 +14,7 @@ def pull_Eldata(dir):
     rad = Vel_data[:, 0] * (np.pi/180)
     return np.column_stack((rad, Vel_data[:, 1]))  # (RADIANS, energy(hartree))
 
-def pull_DVR_data(dir, DVR_fn):
+def pull_DVR_data(dir, DVR_fn, levs_to_calc=7):
     dvr_dat = np.loadtxt(os.path.join(dir, DVR_fn))
     dvr_dat[:, 1:] = Constants.convert(dvr_dat[:, 1:], "wavenumbers", to_AU=True)
     # [degrees vOH=0 ... vOH=6]
@@ -26,7 +26,7 @@ def pull_DVR_data(dir, DVR_fn):
     rad = dvr_dat[:, 0] * (np.pi/180)
     Eldat = pull_Eldata(dir)
     coeff_dict["Vel"] = calc_coefs(Eldat)
-    for i in np.arange(1, dvr_dat.shape[1]):  # loop through saved energies
+    for i in np.arange(1, levs_to_calc + 1):  # loop through saved energies
         shifted_en = dvr_dat[:, i]
         energies = np.column_stack((rad, shifted_en))
         coeff_dict[f"V{i-1}"] = calc_coefs(energies)

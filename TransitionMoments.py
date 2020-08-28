@@ -12,35 +12,38 @@ def pull_dipoles(dirname, npz_fn):
     return data
 
 def pull_dipole_derivs(dirname, eqdip_fn, deriv_fn):
-    import matplotlib.pyplot as plt
     ed_fn = os.path.join(dirname, eqdip_fn)
     de_fn = os.path.join(dirname, deriv_fn)
     EQdip = np.loadtxt(ed_fn)
     derivs = np.loadtxt(de_fn)  # derivs in au/bohr
-    # degrees = np.linspace(0, 360, len(EQdip))
-    # for c, val in enumerate(["X", "Y", "Z"]):
-    #     plt.plot(degrees, EQdip[:, c], 'o', label=f"{val} - Component")
-    # plt.title("EQ Dipole")
-    # plt.legend()
-    # plt.show()
-    # for c, val in enumerate(["X", "Y", "Z"]):
-    #     plt.plot(degrees, derivs[:, c], 'o', label=f"{val} - Component")
-    # plt.title("OH Dipole Derivative")
-    # plt.legend()
-    # plt.show()
     return EQdip, derivs
+
+def plot_dipole_derivs(dirname, eqdip_fn, deriv_fn):
+    import matplotlib.pyplot as plt
+    EQdip, derivs = pull_dipole_derivs(dirname, eqdip_fn, deriv_fn)
+    degrees = np.linspace(0, 360, len(EQdip))
+    for c, val in enumerate(["X", "Y", "Z"]):
+        plt.plot(degrees, EQdip[:, c], 'o', label=f"{val} - Component")
+    plt.title("EQ Dipole")
+    plt.legend()
+    plt.show()
+    for c, val in enumerate(["X", "Y", "Z"]):
+        plt.plot(degrees, derivs[:, c], 'o', label=f"{val} - Component")
+    plt.title("OH Dipole Derivative")
+    plt.legend()
+    plt.show()
 
 # calculate OH wfns
 def run_DVR(dirname, Rmins_fn, Renergies_fn):
     from DegreeDVR import formatData, run_anharOH_DVR
     dat = formatData(os.path.join(dirname, Rmins_fn), os.path.join(dirname, Renergies_fn))
     potential_array, epsilon_pots, wavefuns_array = run_anharOH_DVR(dat, desiredEnergies=7, NumPts=1500)
-    return wavefuns_array, potential_array  # pot in ang/har
+    return wavefuns_array, potential_array, epsilon_pots  # pot in ang/har
 
 # reshape dips and wfns
 def interpDW(dirname, Rmins_fn, Renergies_fn, npz_fn=None, eqdip_fn=None, deriv_fn=None):
     from scipy import interpolate
-    wavefuns, pot = run_DVR(dirname, Rmins_fn, Renergies_fn)
+    wavefuns, pot, epsilons = run_DVR(dirname, Rmins_fn, Renergies_fn)
     Rmins = np.loadtxt(os.path.join(dirname, Rmins_fn))
     if npz_fn is not None:
         flag = "dipoles"
@@ -56,7 +59,8 @@ def interpDW(dirname, Rmins_fn, Renergies_fn, npz_fn=None, eqdip_fn=None, deriv_
     pot_bohr = Constants.convert(pot[:, :, 0], "angstroms", to_AU=True)  # convert to bohr before using with derivs
     grid_min = np.min(pot_bohr)
     grid_max = np.max(pot_bohr)
-    new_grid = np.linspace(grid_min, grid_max, 500)
+    new_grid = np.linspace(grid_min, grid_max, wavefuns.shape[1])
+    # interpolate wavefunction to same size, but still renormalize (when using values) to be safe
     interp_wfns = np.zeros((wavefuns.shape[0], len(new_grid), wavefuns.shape[2]))
     interp_dips = np.zeros((wavefuns.shape[0], len(new_grid), 3))
     for i in np.arange(wavefuns.shape[0]):  # loop through torsion degrees
@@ -91,7 +95,8 @@ def plot_interpDW(dirname, Rmins_fn, Renergies_fn, npz_fn=None, eqdip_fn=None, d
 
 # calculate TDM
 def calc_TDM(dipoles, ohWfns, transition="0 -> 1"):
-    """calculates the transition moment at each degree value. Returns the TDM at each degree"""
+    """calculates the transition moment at each degree value. Returns the TDM at each degree.
+        Normalize the mu value with the normalization of the wavefunction!!!"""
     mus = np.zeros((len(dipoles), 3))
     Glevel = int(transition[0])
     Exlevel = int(transition[-1])
@@ -102,7 +107,8 @@ def calc_TDM(dipoles, ohWfns, transition="0 -> 1"):
             es_wfn_t = es_wfn.reshape(-1, 1)
             soup = np.diag(dipoles[k, :, j]).dot(es_wfn_t)
             mu = gs_wfn.dot(soup)
-            mus[k, j] = mu
+            normMu = mu / (gs_wfn.dot(gs_wfn) * es_wfn.dot(es_wfn))  # this triple check that everything is normalized
+            mus[k, j] = normMu
     return mus  # in all au, returns only the TDM of the given transition
 
 def plot_TDM(dipoles, ohWfns, transition="0 -> 1"):  # fix this
@@ -156,7 +162,7 @@ def run_FE(barrier_height=None):
 
 # calculate overlap of torsion wfns with TDM
 def calc_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None, npz_fn=None,
-                   size=15, transition="0 -> 1", barrier_height=None):
+                   size=15, transition="0 -> 1", numGstates=4, numEstates=4, barrier_height=None):
     TDM_mats = calc_TDM_matrix(dirname, Rmins_fn, Renergies_fn, eqdip_fn, deriv_fn, npz_fn,
                                size=size, transition=transition)
     torWfn_coefs, torEnergies = run_FE(barrier_height=barrier_height)
@@ -164,9 +170,10 @@ def calc_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None
     Glevel = f"res{transition[0]}"
     Exlevel = f"res{transition[-1]}"
     intensities = []
-    for gState in np.arange(4):
-        for exState in np.arange(4):
+    for gState in np.arange(numGstates):
+        for exState in np.arange(numEstates):
             freq = torEnergies[Exlevel][exState] - torEnergies[Glevel][gState]
+            print(f"E_inital :  ", Constants.convert(torEnergies[Glevel][gState], "wavenumbers", to_AU=False))
             freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
             print("\n")
             print(f"OH - {transition}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
@@ -174,34 +181,8 @@ def calc_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None
             for c, val in enumerate(["A", "B", "C"]):  # loop through components
                 supere = np.dot(TDM_mats[c, :, :], torWfn_coefs[Exlevel][:, exState].T)
                 matEl = np.dot(torWfn_coefs[Glevel][:, gState], supere)
+                # pop = 0.695034800  # Boltzman in cm^-1 / K
                 comp_intents[c] = (abs(matEl) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)
-                print(f"{val} : {comp_intents[c]:.8f} km/mol")
-            print(f"total : {np.sum(comp_intents):.6f}")
-            if comp_intents[1] > 1E-10:
-                ratio = comp_intents[1] / comp_intents[2]
-                print(f"B/C ratio : {ratio:.4f}")
-            intensities.append([gState, exState, freq_wave, np.sum(comp_intents)])
-    return intensities  # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol)]
-
-def calc_2intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None, npz_fn=None,
-                    size=15, transition="2 -> 4", barrier_height=None):
-    TDM_mats = calc_TDM_matrix(dirname, Rmins_fn, Renergies_fn, eqdip_fn, deriv_fn, npz_fn,
-                               size=size, transition=transition)
-    torWfn_coefs, torEnergies = run_FE(barrier_height=barrier_height)
-    Glevel = f"res{transition[0]}"
-    Exlevel = f"res{transition[-1]}"
-    intensities = []
-    for gState in np.arange(2):
-        for exState in np.arange(11):
-            freq = torEnergies[Exlevel][exState] - torEnergies[Glevel][gState]
-            freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
-            print("\n")
-            print(f"OH - {transition}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
-            comp_intents = np.zeros(3)
-            for c, val in enumerate(["A", "B", "C"]):  # loop through components
-                supere = np.dot(TDM_mats[c, :, :], torWfn_coefs[Exlevel][:, exState].T)
-                matEl = np.dot(torWfn_coefs[Glevel][:, gState], supere)
-                comp_intents[c] = (abs(matEl) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)  # convert to km/mol
                 print(f"{val} : {comp_intents[c]:.8f} km/mol")
             print(f"total : {np.sum(comp_intents):.6f}")
             if comp_intents[1] > 1E-10:
@@ -227,10 +208,14 @@ def calc_stat_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn
         OH_ex = evaluatePot(OH_excoefs, value)
         freq = OH_ex - OH_0
         freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
+        print("\n")
         print(f"Stationary Frequency : {freq_wave}")
         for c, val in enumerate(["A", "B", "C"]):  # loop through components
             intensity[i, c] = (abs(mus[idx, c]))**2 * freq_wave * 2.506 / (0.393456 ** 2)  # convert to km/mol
             print(f"Stationary Intensity @ {value} {val} : {intensity[i, c]}")
+        print(f"Total Intensity {value} : ", np.sum(intensity[i, :]))
+        oStrength = np.sum(intensity[i, :]) / 5.33E6
+        print(f"Oscillator Strength @ {value} : {oStrength}")
     return intensity
 
 def plot_stat_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None, npz_fn=None,
@@ -272,12 +257,13 @@ if __name__ == '__main__':
     RenergiesTBHP = "Energies_TBHP_extended.txt"
     eqdipsTBHP = "ek_dip.dat"
     dipDerivsTBHP = "ekOHDerivs.dat"
-    g, wfns, dips = interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
-    plot_interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
+    g, wfns, dips = interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles_new.npz")
+    # plot_interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
     # plot_TDM(dips, wfns, transition="0 -> 2")
-    # calc_2intensity(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz", transition="2 -> 4")
+    calc_intensity(TBHPdir, RminsTBHP, RenergiesTBHP,  npz_fn="rotated_dipoles_new.npz", transition="0 -> 2")
     # v = list(np.arange(0, 370, 10))
-    # plot_stat_intensity(TBHPdir, RminsTBHP, RenergiesTBHP, eqdip_fn=eqdipsTBHP, deriv_fn=dipDerivsTBHP,
-    #                     transition="0 -> 2", values=v)
+    # for i in np.arange(1, 6):
+    #     calc_stat_intensity(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles_new.npz",
+    #                         transition=f"0 -> {i}", values=[250])
     # bhs = list(np.arange(250, 375, 25))
-    # tor_freq_plot(TBHPdir, RminsTBHP, RenergiesTBHP, bhs, npz_fn="rotated_dipoles.npz", transition="0 -> 4")
+    # tor_freq_plot(TBHPdir, RminsTBHP, RenergiesTBHP, bhs, npz_fn="rotated_dipoles_new.npz", transition="0 -> 2")
