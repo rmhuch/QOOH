@@ -11,7 +11,7 @@ def pull_coordsandmodes(coord_vals, modedir):
                                1.00782504, 12., 1.00782504, 1.00782504, 1.00782504, 12.,
                                1.00782504, 1.00782504, 1.00782504, 1.00782504]))
     for i in coord_vals:
-        dat = np.loadtxt(os.path.join(modedir, f"tbhp_eq_{i}oh_modes.dat"))
+        dat = np.loadtxt(os.path.join(modedir, f"tbhp_eq_v{i}_modes.dat"))  # f"tbhp_eq_{i}oh_modes.dat"
         coordies = Constants.convert(np.reshape(dat[:1, :], (-1, 3)), "angstroms", to_AU=False)
         coords.append(coordies)
         big_mode_data = Constants.convert(dat[1:, :], "angstroms", to_AU=False)

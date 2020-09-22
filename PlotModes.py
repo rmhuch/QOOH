@@ -13,8 +13,9 @@ def loadModeData(mode, freqdir, modedir):
     f = []
     m = []
     for i in x:
-        f.append(np.loadtxt(os.path.join(freqdir, f"tbhp_eq_{i}oh_freqs.dat")))
-        m.append(np.loadtxt(os.path.join(modedir, f"tbhp_eq_{i}oh_modes.dat"))[1:, :])
+        # f"tbhp_eq_{i}oh_freqs.dat"
+        f.append(np.loadtxt(os.path.join(freqdir, f"tbhp_eq_v{i}_freqs.dat")))
+        m.append(np.loadtxt(os.path.join(modedir, f"tbhp_eq_v{i}_modes.dat"))[1:, :])
     freqarray = np.array(f)  # coord x num modes array
     modearray = m
     return modearray, freqarray
@@ -35,7 +36,8 @@ def plot_OOfreqsAC(data):
 
 def plot_OOvsrOH(data, vals, modedir, filename=None):
     from CalcModeContributions import OOContribs
-    rOH = np.arange(0.96568, 1.76568, 0.1)
+    # rOH = np.arange(0.96568, 1.76568, 0.1)  # for original
+    rOH = np.array((0.98149, 1.01601, 1.05222, 1.09009, 1.12931, 1.17051, 1.21424))
     contribDict = OOContribs(vals, modedir)
     freqs = data[1]
     one = []
@@ -77,7 +79,8 @@ def plot_OOvsrOH(data, vals, modedir, filename=None):
 
 def plot_OOHvsrOH(data, vals, modedir, filename=None):
     from CalcModeContributions import OOHContribs
-    rOH = np.arange(0.96568, 1.76568, 0.1)
+    # rOH = np.arange(0.96568, 1.76568, 0.1)  # for orginial
+    rOH = np.array((0.98149, 1.01601, 1.05222, 1.09009, 1.12931, 1.17051, 1.21424))
     contribDict = OOHContribs(vals, modedir)
     freqs = data[1]
     one = []
@@ -94,13 +97,13 @@ def plot_OOHvsrOH(data, vals, modedir, filename=None):
 
     f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
     ax2.plot(one[:, 0], one[:, 3], "ro")
-    ax2.plot(two[:, 0], two[:, 3], "bo")
-    ax2.axes.set_ylim(1050, 1575)
+    # ax2.plot(two[:, 0], two[:, 3], "bo")
+    ax2.axes.set_ylim(1300, 1600)
     ax2.axes.set_ylabel(r"OOH Bend Frequency (cm$^{-1}$)")
     ax2.axes.set_xlabel(r"rOH ($\AA$)")
 
     ax.plot(one[:, 0], one[:, 2], "ro")
-    ax.plot(two[:, 0], two[:, 2], "bo")
+    # ax.plot(two[:, 0], two[:, 2], "bo")
     ax.tick_params(labelbottom=True)
     ax.axes.set_ylim(30, 100)
     ax.axes.set_ylabel("OOH Bend Contribution (%)")
@@ -137,15 +140,27 @@ def plot_HarmonicZPEvsrOH(data, potfile, filename=None):
 
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
     OHdir = os.path.join(udrive, "TBHP", "eq_scans")
-    OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
-    OHmodedir = os.path.join(OHdir, "oh_modes")
+    # OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
+    # OHmodedir = os.path.join(OHdir, "oh_modes")
+    # OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
+    # OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
+    #
+    # dat = loadModeData(OHvals, OHfreqdir, OHmodedir)
+    # potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
+    # plot_OOvsrOH(dat, OHvals, OHmodedir, filename="OOFreqsvsrOH")
+    # plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH")
+    # plot_OOHvsrOH(dat, OHvals, OHmodedir, filename="OOHFreqsvsrOH")
 
-    OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
-    OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
+    VIBdir = os.path.join(udrive, "TBHP", "VibStateFchks")
+    VIBfreqdir = os.path.join(VIBdir, "vib_state_mode_freqs")
+    VIBmodedir = os.path.join(VIBdir, "vib_state_modes")
+    vibfiles = np.arange(7)
 
-    dat = loadModeData(OHvals, OHfreqdir, OHmodedir)
+    dat = loadModeData(vibfiles, VIBfreqdir, VIBmodedir)
     potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
-    plot_OOvsrOH(dat, OHvals, OHmodedir, filename="OOFreqsvsrOH")
-    plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH")
-    plot_OOHvsrOH(dat, OHvals, OHmodedir, filename="OOHFreqsvsrOH")
+    # plot_OOvsrOH(dat, vibfiles, VIBmodedir, filename="OOFreqsvsrOH_expectation")
+    # plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH_expectation")
+    plot_OOHvsrOH(dat, vibfiles, VIBmodedir, filename="OOHFreqsvsrOH_expectation")
+

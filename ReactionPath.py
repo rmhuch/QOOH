@@ -205,21 +205,26 @@ def run(fchk_names, fn):
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
-    OHdir = os.path.join(udrive, "TBHP", "eq_scans")
-    OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
-    OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
-    OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
+    # OHdir = os.path.join(udrive, "TBHP", "eq_scans")
+    # OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
+    # OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
+    # OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
+    #
+    # for i in OHfiles:
+    #     fn = os.path.join(OHdir, f"tbhp_eq_{i}.fchk")
+    #     run(fn, f"tbhp_eq_{i}oh")
+    #
+    # TORdir = os.path.join(udrive, "TBHP", "TorFchks")
+    # torfiles = ["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110", "120",
+    #             "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230", "240", "250",
+    #             "260", "270", "280", "290", "300", "310", "320", "330", "340", "350", "360"]
+    # for j in torfiles:
+    #     fnn = os.path.join(TORdir, f"tbhp_{j}.fchk")
+    #     run(fnn, f"tbhp_{j}tor")
 
-    for i in OHfiles:
-        fn = os.path.join(OHdir, f"tbhp_eq_{i}.fchk")
-        dat = DataClass(fn)
-        run(fn, f"tbhp_eq_{i}oh")
+    VIBdir = os.path.join(udrive, "TBHP", "VibStateFchks")
+    vibfiles = np.arange(7)
+    for k in vibfiles:
+        fname = os.path.join(VIBdir, f"tbhp_eq_v{k}.fchk")
+        run(fname, f"tbhp_eq_v{k}")
 
-    TORdir = os.path.join(udrive, "TBHP", "TorFchks")
-    torfiles = ["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110", "120",
-                "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230", "240", "250",
-                "260", "270", "280", "290", "300", "310", "320", "330", "340", "350", "360"]
-    for j in torfiles:
-        fnn = os.path.join(TORdir, f"tbhp_{j}.fchk")
-        dataa = DataClass(fnn)
-        run(fnn, f"tbhp_{j}tor")

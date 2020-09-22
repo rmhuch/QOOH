@@ -6,28 +6,32 @@ from Converter import Constants
 
 udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 TBHPdir = os.path.join(udrive, "TBHP")
+QOOHdir = os.path.join(udrive, "QOOH")
 
-def pull_Eldata(dir):
-    FEdir = os.path.join(dir, "Fourier Expansions")
+def pull_Eldata(mol_dir):
+    FEdir = os.path.join(mol_dir, "Fourier Expansions")
     # Vel is actually the electronic energy + the ZPE of the reaction path work... but Vel for short.
     Vel_data = np.loadtxt(os.path.join(FEdir, "VelZPE_Data_TBHP.csv"), delimiter=",")
     rad = Vel_data[:, 0] * (np.pi/180)
     return np.column_stack((rad, Vel_data[:, 1]))  # (RADIANS, energy(hartree))
 
-def pull_DVR_data(dir, DVR_fn, levs_to_calc=7):
-    dvr_dat = np.loadtxt(os.path.join(dir, DVR_fn))
-    dvr_dat[:, 1:] = Constants.convert(dvr_dat[:, 1:], "wavenumbers", to_AU=True)
+def pull_DVR_data(mol_dir, gmatrix_coeffs, DVR_fn=None, DVR_npz=None,  levs_to_calc=7):
+    if DVR_npz is None:
+        dvr_energies = np.loadtxt(os.path.join(mol_dir, DVR_fn))
+        dvr_energies[:, 1:] = Constants.convert(dvr_energies[:, 1:], "wavenumbers", to_AU=True)
+    else:
+        all_dvr_dat = np.load(os.path.join(mol_dir, DVR_npz), allow_pickle=True)
+        dvr_energies = all_dvr_dat["energies"]
+        dvr_energies[:, 1:] = Constants.convert(dvr_energies[:, 1:], "wavenumbers", to_AU=True)
     # [degrees vOH=0 ... vOH=6]
     coeff_dict = dict()  # build new coeff dict based on extended scans
-    FEdir = os.path.join(dir, "Fourier Expansions")
-    Bel_coeffs = np.loadtxt(os.path.join(FEdir, "Gel_Fit_Coeffs_TBHP.csv"), delimiter=",")
-    Bel_coeffs /= 2
-    coeff_dict["Bel"] = Bel_coeffs
-    rad = dvr_dat[:, 0] * (np.pi/180)
-    Eldat = pull_Eldata(dir)
+    gmatrix_coeffs /= 2
+    coeff_dict["Bel"] = gmatrix_coeffs
+    rad = dvr_energies[:, 0] * (np.pi/180)
+    Eldat = pull_Eldata(mol_dir)
     coeff_dict["Vel"] = calc_coefs(Eldat)
     for i in np.arange(1, levs_to_calc + 1):  # loop through saved energies
-        shifted_en = dvr_dat[:, i]
+        shifted_en = dvr_energies[:, i]
         energies = np.column_stack((rad, shifted_en))
         coeff_dict[f"V{i-1}"] = calc_coefs(energies)
     return coeff_dict
@@ -72,13 +76,13 @@ def calc_curves(x, coefs):
 
 def runtest():
     dat = pull_Eldata(TBHPdir)
-    coeffs = calc_coefs(dat)
     x = np.linspace(0, 2*np.pi, 100)
     sf, scaled_dat = scale_barrier(dat, barrier_height=275)
     scaled_coefs = calc_coefs(scaled_dat)
     calc_curves(x, scaled_coefs)
 
 if __name__ == '__main__':
-    # runtest()
-    dvvr = "energiesDVR_TBHP_extended.txt"
-    pull_DVR_data(TBHPdir, dvvr)
+    runtest()
+    # dvvr = "energiesDVR_TBHP_extended.txt"
+    # gcoeffs = np.loadtxt(os.path.join(TBHPdir, "Fourier Expansions", "Gel_Fit_Coeffs_TBHP.csv"), delimiter=",")
+    # pull_DVR_data(TBHPdir, gcoeffs, DVR_fn=dvvr)

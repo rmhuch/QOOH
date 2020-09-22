@@ -35,9 +35,9 @@ def plot_dipole_derivs(dirname, eqdip_fn, deriv_fn):
 
 # calculate OH wfns
 def run_DVR(dirname, Rmins_fn, Renergies_fn):
-    from DegreeDVR import formatData, run_anharOH_DVR
-    dat = formatData(os.path.join(dirname, Rmins_fn), os.path.join(dirname, Renergies_fn))
-    potential_array, epsilon_pots, wavefuns_array = run_anharOH_DVR(dat, desiredEnergies=7, NumPts=1500)
+    from DegreeDVR import formatTXTData, run_OH_DVR
+    dat = formatTXTData(os.path.join(dirname, Rmins_fn), os.path.join(dirname, Renergies_fn))
+    potential_array, epsilon_pots, wavefuns_array = run_OH_DVR(dat, desiredEnergies=7, NumPts=2000)
     return wavefuns_array, potential_array, epsilon_pots  # pot in ang/har
 
 # reshape dips and wfns
@@ -71,7 +71,9 @@ def interpDW(dirname, Rmins_fn, Renergies_fn, npz_fn=None, eqdip_fn=None, deriv_
         for c in np.arange(3):  # loop through dipole components
             if flag == "dipoles":
                 dipole_dat = dipole_dict[f"tbhp_{tor_degrees[i]:0>3}.log"]
-                new_dipole_dat = np.column_stack((dipole_dat[:, 0], dipole_dat[:, 3], dipole_dat[:, 1], dipole_dat[:, 2]))
+                new_dipole_dat = np.column_stack((dipole_dat[:, 0], dipole_dat[:, 3], dipole_dat[:, 2], dipole_dat[:, 1]))
+                # somehow in PA embedding the order of the components gets flipped to 'C B A' so we flip back to avoid
+                # any problems 
                 new_dipole_dat[:, 0] = Constants.convert(new_dipole_dat[:, 0], "angstroms", to_AU=True)
                 f = interpolate.interp1d(new_dipole_dat[:-1, 0], new_dipole_dat[:-1, c+1],
                                          kind="cubic", bounds_error=False, fill_value="extrapolate")
@@ -151,7 +153,7 @@ def run_FE(barrier_height=None):
     if barrier_height is None:
         resEl, results = run()  # plots bool
     else:
-        results = run_Scaling(barrier_height=barrier_height, plots=False)  # plots bool
+        results = run_Scaling(barrier_height=barrier_height)  # plots bool
     torWfn_coefs = dict()
     torEnergies = dict()
     dict_names = ["res0", "res1", "res2", "res3", "res4", "res5", "res6"]
@@ -173,21 +175,21 @@ def calc_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn=None
     for gState in np.arange(numGstates):
         for exState in np.arange(numEstates):
             freq = torEnergies[Exlevel][exState] - torEnergies[Glevel][gState]
-            print(f"E_inital :  ", Constants.convert(torEnergies[Glevel][gState], "wavenumbers", to_AU=False))
+            # print(f"E_inital :  ", Constants.convert(torEnergies[Glevel][gState], "wavenumbers", to_AU=False))
             freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
-            print("\n")
-            print(f"OH - {transition}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
+            # print("\n")
+            # print(f"OH - {transition}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
             comp_intents = np.zeros(3)
             for c, val in enumerate(["A", "B", "C"]):  # loop through components
                 supere = np.dot(TDM_mats[c, :, :], torWfn_coefs[Exlevel][:, exState].T)
                 matEl = np.dot(torWfn_coefs[Glevel][:, gState], supere)
                 # pop = 0.695034800  # Boltzman in cm^-1 / K
                 comp_intents[c] = (abs(matEl) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)
-                print(f"{val} : {comp_intents[c]:.8f} km/mol")
-            print(f"total : {np.sum(comp_intents):.6f}")
+                # print(f"{val} : {comp_intents[c]:.8f} km/mol")
+            # print(f"total : {np.sum(comp_intents):.6f}")
             if comp_intents[1] > 1E-10:
                 ratio = comp_intents[1] / comp_intents[2]
-                print(f"B/C ratio : {ratio:.4f}")
+                # print(f"B/C ratio : {ratio:.4f}")
             intensities.append([gState, exState, freq_wave, np.sum(comp_intents)])
     return intensities  # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol)]
 
@@ -228,42 +230,42 @@ def plot_stat_intensity(dirname, Rmins_fn, Renergies_fn, eqdip_fn=None, deriv_fn
     plt.legend()
     plt.show()
 
-def tor_freq_plot(dirname, Rmins_fn, Renergies_fn, barrier_heights, eqdip_fn=None, deriv_fn=None, npz_fn=None,
-                  size=15, transition="0 -> 1"):
+def tor_freq_plot(barrier_heights, expvals, oh_levels=[2, 3, 4, 5]):
     import matplotlib.pyplot as plt
-    data = dict()
-    data[312] = calc_intensity(dirname, Rmins_fn, Renergies_fn, npz_fn=npz_fn, eqdip_fn=eqdip_fn,
-                               deriv_fn=deriv_fn, size=size, transition=transition)
-    trans02t = data[312][2]
-    trans22t = data[312][10]
-    # print(f"312 splitting : {trans02t[2] - trans22t[2]}")
-    plt.plot(312, trans02t[2]-trans22t[2], 'om')
-    for i, bh in enumerate(barrier_heights):
-        print(bh)
-        intensities = calc_intensity(dirname, Rmins_fn, Renergies_fn, npz_fn=npz_fn, eqdip_fn=eqdip_fn,
-                                     deriv_fn=deriv_fn, size=size, transition=transition, barrier_height=bh)
-        trans02 = intensities[2]
-        trans22 = intensities[10]
-        # print(f"{bh} splitting : {trans02[2]-trans22[2]}")
-        plt.plot(bh, trans02[2]-trans22[2], 'og')
-        data[bh] = intensities  # bh : [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol)]
+    colors = ["r", "b", "g", "indigo"]
+    for i, level in enumerate(oh_levels):
+        plt_data = np.zeros((len(barrier_heights), 3))
+        for j, bh in enumerate(barrier_heights):
+            if bh is None:
+                plt_data[j, 0] = 312  # FOR TBHP
+            else:
+                plt_data[j, 0] = bh
+            torWfn_coefs, torEnergies = run_FE(barrier_height=bh)
+            Viblevel = f"res{level}"
+            torEnergiesWave = Constants.convert(torEnergies[Viblevel], "wavenumbers", to_AU=False)
+            for exState in np.arange(2, 4):
+                plt_data[j, exState-1] = torEnergiesWave[exState] - torEnergiesWave[0]
+        plt.plot(plt_data[:, 0], plt_data[:, 1], 'o', color=colors[i], label=f"vOH = {level}")
+        plt.plot(plt_data[:, 0], plt_data[:, 2], '^', color=colors[i])
+        plt.plot(barrier_heights[1:], np.repeat(expvals[i], len(barrier_heights[1:])), color=colors[i])
     plt.xlabel("Vel + R path Barrier Height")
-    plt.ylabel("Energy Splitting (cm^-1)")
+    plt.ylabel("Torsion Frequency (cm^-1)")
+    plt.legend()
     plt.show()
-    return data
 
 if __name__ == '__main__':
     RminsTBHP = "Rmins_TBHP.txt"
     RenergiesTBHP = "Energies_TBHP_extended.txt"
     eqdipsTBHP = "ek_dip.dat"
     dipDerivsTBHP = "ekOHDerivs.dat"
-    g, wfns, dips = interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles_new.npz")
+    # g, wfns, dips = interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles_tbhp.npz")
     # plot_interpDW(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles.npz")
     # plot_TDM(dips, wfns, transition="0 -> 2")
-    calc_intensity(TBHPdir, RminsTBHP, RenergiesTBHP,  npz_fn="rotated_dipoles_new.npz", transition="0 -> 2")
+    # calc_intensity(TBHPdir, RminsTBHP, RenergiesTBHP,  npz_fn="rotated_dipoles_tbhp.npz", transition="0 -> 2")
     # v = list(np.arange(0, 370, 10))
     # for i in np.arange(1, 6):
-    #     calc_stat_intensity(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles_new.npz",
-    #                         transition=f"0 -> {i}", values=[250])
-    # bhs = list(np.arange(250, 375, 25))
-    # tor_freq_plot(TBHPdir, RminsTBHP, RenergiesTBHP, bhs, npz_fn="rotated_dipoles_new.npz", transition="0 -> 2")
+    #     calc_stat_intensity(TBHPdir, RminsTBHP, RenergiesTBHP, npz_fn="rotated_dipoles_tbhp.npz",
+    #                         transition=f"0 -> {i}", values=[240, 250, 260, 270])
+    bhs = [None, 250, 275, 300, 325, 350]
+    TBHPexp = [186, 198, 217, 262]
+    tor_freq_plot(bhs, TBHPexp)

@@ -1,7 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-from Converter import Constants
 from scaledCoefs import *
 
 udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -66,63 +62,6 @@ def make_scaledPots(coeffDict, barrier_height, makeplot=False):
         plt.show()
     return scaled_coeffs
 
-def calcHam(V_coeffs, B_coeffs, HamSize=None):
-    """This should be fed the appropriately scaled Vcoefs, just calculates the Hamiltonian based of what it is given"""
-    if HamSize is None:  # make more flexible to different order sizes in expansion - currently only supports 6
-        HamSize = 7
-    fullsize = 2*HamSize + 1
-    Ham = np.zeros((fullsize, fullsize))
-    for l in np.arange(fullsize):
-        k = l - HamSize
-        Ham[l, l] = B_coeffs[0] * (k**2) + V_coeffs[0]  # m=0
-        for kprime in np.arange(k+1, k-7, -1):
-            m = k - kprime
-            if m > 0 and l-m >= 0:
-                Ham[l, l-m] = (kprime ** 2 + k ** 2 - m ** 2) * (B_coeffs[m] / 4) + (V_coeffs[m] / 2)
-                Ham[l-m, l] = Ham[l, l-m]
-            else:
-                pass
-    return Ham
-
-def calc_sinHam(M_coeffs, HamSize=None):
-    if HamSize is None:  # make more flexible to different order sizes in expansion - currently only supports 6
-        HamSize = 7
-    fullsize = 2*HamSize + 1
-    Ham = np.zeros((fullsize, fullsize))
-    for l in np.arange(fullsize):
-        k = l - HamSize
-        for kprime in np.arange(k+1, k-7, -1):
-            m = k - kprime
-            if m > 0 and l-m >= 0:
-                Ham[l, l-m] = M_coeffs[m] / 2
-                Ham[l-m, l] = -Ham[l, l-m]
-            else:
-                pass
-    return Ham
-
-def calcEns(V_coeffs, B_coeffs, HamSize=None):
-    ham = calcHam(V_coeffs, B_coeffs, HamSize=HamSize)
-    energy, eigvecs = np.linalg.eigh(ham)
-    spacings = np.array((energy[1]-energy[0], energy[2]-energy[0]))
-    enwfn = {'V': V_coeffs,
-             'energy': energy,
-             'eigvecs': eigvecs,
-             'spacings': spacings}
-    return enwfn
-
-def PORwfns(eigenvectors, theta):
-    ks = np.arange(len(eigenvectors)//2*-1, len(eigenvectors)//2+1)
-    vals = np.zeros((len(theta), len(eigenvectors)))
-    for n in np.arange(len(eigenvectors)):
-        c_ks = eigenvectors[:, n]
-        re = np.zeros((len(theta), len(eigenvectors)))
-        im = np.zeros((len(theta), len(eigenvectors)))
-        for i, k in enumerate(ks):
-            im[:, i] = c_ks[i] * (1 / np.sqrt(2 * np.pi)) * np.sin(k * theta)
-            re[:, i] = c_ks[i] * (1 / np.sqrt(2 * np.pi)) * np.cos(k * theta)
-        vals[:, n] = np.sum(re, axis=1) + np.sum(im, axis=1)
-    return vals
-
 def make_plots(resDicts, levels=False, wfns=True, title=None):
     for resDict in resDicts:
         x = np.linspace(0, 2*np.pi, 100)
@@ -157,9 +96,10 @@ def make_plots(resDicts, levels=False, wfns=True, title=None):
     # plt.legend()
     plt.show()
     
-def run(levs_to_calc=7):
+def run(levs_to_calc=7):  # WATCH THIS! IT NEEDS DVR-NPZ BACK EVENTUALLY
+    gcoeffs = np.loadtxt(os.path.join(TBHPdir, "Fourier Expansions", "Gel_Fit_Coeffs_TBHP.csv"), delimiter=",")
     dvvr = "energiesDVR_TBHP_extended1500.txt"
-    coefDict = pull_DVR_data(TBHPdir, dvvr, levs_to_calc=levs_to_calc)
+    coefDict = pull_DVR_data(TBHPdir, gcoeffs, DVR_fn=dvvr, levs_to_calc=levs_to_calc)
     # coefDict = pullCoefs(TBHPdir)
     res = calcEns(coefDict["Vel"], coefDict["Bel"], HamSize=15)  # converged (15-50)
     results = []
@@ -168,15 +108,17 @@ def run(levs_to_calc=7):
         results.append(calcEns(Vi, coefDict["Bel"], HamSize=15))
     return res, results  # returns electronic energies and list of results of higher values
 
-def run_Scaling(barrier_height=275):
+def run_Scaling(barrier_height=275, levs_to_calc=7):
     dat = pull_Eldata(TBHPdir)  # pull electronic energy data as per scaledCoefs
-    dvvr = "energiesDVR_TBHP_extended1500.txt"
-    coefDict = pull_DVR_data(TBHPdir, dvvr)
+    # dvvr = "energiesDVR_TBHP_extended1500.txt"
+    dvvr = "energiesDVR_TBHP_extended.txt"
+    gcoeffs = np.loadtxt(os.path.join(TBHPdir, "Fourier Expansions", "Gel_Fit_Coeffs_TBHP.csv"), delimiter=",")
+    coefDict = pull_DVR_data(TBHPdir, gcoeffs, DVR_fn=dvvr, levs_to_calc=levs_to_calc)
     # coefDict = pullCoefs(TBHPdir)  # pulls coefs from Mark's fits
     sf, scaled_dat = scale_barrier(dat, barrier_height=barrier_height)
     scaled_ELcoefs = calc_coefs(scaled_dat)
     coefDict["scaledVel"] = scaled_ELcoefs
-    all_scaledcoeffs = make_scaledPots(coefDict, barrier_height=barrier_height)
+    all_scaledcoeffs = make_scaledPots(coefDict, barrier_height=barrier_height, makeplot=False)
     results = []
     for i in np.arange(len(all_scaledcoeffs)):  # loop through scaled coefficients
         Vi = all_scaledcoeffs[i]
@@ -185,4 +127,4 @@ def run_Scaling(barrier_height=275):
 
 
 if __name__ == '__main__':
-    run(levs_to_calc=3)
+    run_Scaling(levs_to_calc=3)

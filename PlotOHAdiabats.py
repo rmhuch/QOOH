@@ -90,16 +90,16 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     enX = np.linspace(180 / 3, 2 * 180 - 180 / 3, 10)
     if ZPE:
         ax2.plot(x, gsPot, '-k', linewidth=2.5)
-        ax2.plot(enX, np.repeat(en0, len(enX)), "-r", linewidth=2)
-        ax2.plot(enX, np.repeat(en1, len(enX)), "-b", linewidth=1.5)
-        ax2.plot(enX, np.repeat(en2, len(enX)), "-g", linewidth=2)
-        ax2.plot(enX, np.repeat(en3, len(enX)), color="indigo", linewidth=2)
+        ax2.plot(enX, np.repeat(en0, len(enX)), "-r", linewidth=2.5)
+        ax2.plot(enX, np.repeat(en1, len(enX)), "--b", linewidth=2.5)
+        ax2.plot(enX, np.repeat(en2, len(enX)), "-g", linewidth=2.5)
+        ax2.plot(enX, np.repeat(en3, len(enX)), "--", color="indigo", linewidth=2.5)
     else:
         ax2.plot(x, gsPotshift, '-k', linewidth=2.5)
-        ax2.plot(enX, np.repeat(en0 - min(gsPot), len(enX)), "-r", linewidth=2)
-        ax2.plot(enX, np.repeat(en1 - min(gsPot), len(enX)), "-b", linewidth=1.5)
-        ax2.plot(enX, np.repeat(en2 - min(gsPot), len(enX)), "-g", linewidth=2)
-        ax2.plot(enX, np.repeat(en3 - min(gsPot), len(enX)), color="indigo", linewidth=2)
+        ax2.plot(enX, np.repeat(en0 - min(gsPot), len(enX)), "-r", linewidth=2.5)
+        ax2.plot(enX, np.repeat(en1 - min(gsPot), len(enX)), "--b", linewidth=2.5)
+        ax2.plot(enX, np.repeat(en2 - min(gsPot), len(enX)), "-g", linewidth=2.5)
+        ax2.plot(enX, np.repeat(en3 - min(gsPot), len(enX)), "--", color="indigo", linewidth=2.5)
 
     # create es plot
     esPot = Constants.convert(evaluatePot(esRes["V"], rad_x), "wavenumbers", to_AU=False)
@@ -111,16 +111,16 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     enX = np.linspace(180 / 3, 2 * 180 - 180 / 3, 10)
     if ZPE:
         ax.plot(x, esPot, '-k', linewidth=2.5)
-        ax.plot(enX, np.repeat(en0, len(enX)), "-r", linewidth=2)
-        ax.plot(enX, np.repeat(en1, len(enX)), "-b", linewidth=1.5)
-        ax.plot(enX, np.repeat(en2, len(enX)), "-g", linewidth=2)
-        ax.plot(enX, np.repeat(en3, len(enX)), color="indigo", linewidth=2)
+        ax.plot(enX, np.repeat(en0, len(enX)), "-r", linewidth=2.5)
+        ax.plot(enX, np.repeat(en1, len(enX)), "--b", linewidth=2.5)
+        ax.plot(enX, np.repeat(en2, len(enX)), "-g", linewidth=2.5)
+        ax.plot(enX, np.repeat(en3, len(enX)), "--", color="indigo", linewidth=2.5)
     else:
         ax.plot(x, esPotshift, '-k', linewidth=2.5)
-        ax.plot(enX, np.repeat(en0 - min(gsPot), len(enX)), "-r", linewidth=2)
-        ax.plot(enX, np.repeat(en1 - min(gsPot), len(enX)), "-b", linewidth=1.5)
-        ax.plot(enX, np.repeat(en2 - min(gsPot), len(enX)), "-g", linewidth=2)
-        ax.plot(enX, np.repeat(en3 - min(gsPot), len(enX)), color="indigo", linewidth=2)
+        ax.plot(enX, np.repeat(en0 - min(gsPot), len(enX)), "-r", linewidth=2.5)
+        ax.plot(enX, np.repeat(en1 - min(gsPot), len(enX)), "--b", linewidth=2.5)
+        ax.plot(enX, np.repeat(en2 - min(gsPot), len(enX)), "-g", linewidth=2.5)
+        ax.plot(enX, np.repeat(en3 - min(gsPot), len(enX)), "--", color="indigo", linewidth=2.5)
 
     # hide the spines between ax and ax2
     ax.spines['bottom'].set_visible(False)
