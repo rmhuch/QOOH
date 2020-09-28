@@ -32,7 +32,7 @@ def OOHContribs(coord_vals, modedir):
         deriv_OOH[6] = dk
         norm_derivOOH = deriv_OOH / np.linalg.norm(deriv_OOH)
         contribs = np.dot(mode, norm_derivOOH.flatten())
-        norm_contribs = contribs / np.linalg.norm(contribs)
+        norm_contribs = (contribs / np.linalg.norm(contribs))**2
         idx = np.where(abs(norm_contribs) > 0.3)[0]
         contribdat = np.column_stack((idx, abs(norm_contribs[idx])))
         sortdat = contribdat[contribdat[:, 1].argsort()[::-1]]

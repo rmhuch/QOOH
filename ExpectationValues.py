@@ -1,14 +1,7 @@
 import numpy as np
-import os
 from PyDVR import *
 
-def pullEnergies(txtfile):
-    ens = np.loadtxt(txtfile)
-    maxi = 0.7247 + (0.02 * len(ens))
-    x = np.arange(0.7247, maxi, 0.02)
-    x = x[:len(ens)]
-    energy = np.column_stack((x, ens))
-    return energy
+# All of these functions are implemented through the MolecularInfo/MolecularResults class
 
 def run_DVR(Epot_array, extrapolate=0, NumPts=1000, desiredEnergies=3):
     """ Runs anharmonic DVR over the OH coordinate at every degree value."""
@@ -55,11 +48,3 @@ def calc_inverse_expectation_squared(dvr_wavefunctions):
         expect2[i, 1] = wfn2.dot(np.reciprocal(dvr_wavefunctions[:, 0]**2))
     return expect2
 
-
-if __name__ == '__main__':
-    udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    file = os.path.join(udrive, "TBHP", "tbhp_eq_energies.txt")
-    resE = pullEnergies(file)
-    # print(resE)
-    x,  wfns = run_DVR(resE, NumPts=2000, desiredEnergies=7)
-    calc_expectation(wfns)

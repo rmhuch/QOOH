@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 from FChkInterpreter import FchkInterpreter
 from Converter import Constants
 
@@ -192,7 +193,7 @@ def newFMatrix(data):
     f_prime = (np.identity(len(p_prime))-p_prime) @ mwF_mat @ (np.identity(len(p_prime))-p_prime)
     return f_prime
 
-def run(fchk_names, fn):
+def run_modes(fchk_names, fn):
     data = DataClass(fchk_names)
     forcies = newFMatrix(data)
     freqs2, qn = np.linalg.eigh(forcies)
@@ -201,10 +202,31 @@ def run(fchk_names, fn):
     freqs = np.sign(freqs2) * Constants.convert(np.sqrt(np.abs(freqs2)), "wavenumbers", to_AU=False)
     np.savetxt(f"{fn}_freqs.dat", freqs)
 
+def run_energies(fchk_dir, fchk_names):
+    res_dict = dict()
+    electronicE = np.zeros((len(fchk_names), 2))
+    norm_grad_2 = np.zeros((len(fchk_names), 2))
+    degree_vals = np.linspace(0, 360, len(fchk_names))
+    for i, j, k in zip(np.arange(len(degree_vals)), degree_vals, fchk_names):
+        degree_dict = dict()
+        fchkfile = os.path.join(fchk_dir, k)
+        data = DataClass(fchkfile)
+        forcies = newFMatrix(data)
+        freqs2, qn = np.linalg.eigh(forcies)
+        coords = COMcoords(data, massweight=False)
+        # save modes & freqs in nested dictionary keyed by degree value
+        degree_dict["modes"] = np.row_stack((coords.flatten(), qn.T))
+        degree_dict["freqs"] = np.sign(freqs2) * Constants.convert(np.sqrt(np.abs(freqs2)), "wavenumbers", to_AU=False)
+        # save electronicE and norm(gradient)**2 to res_dict when full
+        electronicE[i] = np.column_stack((int(j), data.MP2Energy))
+        norm_grad_2[i] = np.column_stack((int(j), np.linalg.norm(data.gradient)**2))
+        res_dict[int(j)] = degree_dict
+    res_dict["electronicE"] = electronicE
+    res_dict["norm_grad_2"] = norm_grad_2
+    return res_dict  # returns dictionary, keyed by tor angles, also with electronicE and norm(gradient)**2 keys
 
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-
     # OHdir = os.path.join(udrive, "TBHP", "eq_scans")
     # OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
     # OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
@@ -214,17 +236,23 @@ if __name__ == '__main__':
     #     fn = os.path.join(OHdir, f"tbhp_eq_{i}.fchk")
     #     run(fn, f"tbhp_eq_{i}oh")
     #
-    # TORdir = os.path.join(udrive, "TBHP", "TorFchks")
-    # torfiles = ["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110", "120",
-    #             "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230", "240", "250",
-    #             "260", "270", "280", "290", "300", "310", "320", "330", "340", "350", "360"]
-    # for j in torfiles:
-    #     fnn = os.path.join(TORdir, f"tbhp_{j}.fchk")
-    #     run(fnn, f"tbhp_{j}tor")
+    TORdir = os.path.join(udrive, "TBHP", "TorFchks")
+    torfiles = ["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110", "120",
+                "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230", "240", "250",
+                "260", "270", "280", "290", "300", "310", "320", "330", "340", "350", "360"]
+    zpe_mat = np.zeros((len(torfiles), 3))
+    degree = np.arange(0, 370, 10)
+    for i, j in enumerate(torfiles):
+        fnn = os.path.join(TORdir, f"tbhp_{j}.fchk")
+        zpe, elE = run_energies(fnn, f"tbhp_{j}tor")
+        zpe_mat[i] = np.column_stack((degree[i], zpe, elE))
+    zpe_mat[:, 2] -= min(zpe_mat[:, 2])
+    plt.plot(zpe_mat[:, 0], zpe_mat[:, 1]+zpe_mat[:, 2])
+    plt.show()
 
     VIBdir = os.path.join(udrive, "TBHP", "VibStateFchks")
     vibfiles = np.arange(7)
     for k in vibfiles:
         fname = os.path.join(VIBdir, f"tbhp_eq_v{k}.fchk")
-        run(fname, f"tbhp_eq_v{k}")
+        run_modes(fname, f"tbhp_eq_v{k}")
 

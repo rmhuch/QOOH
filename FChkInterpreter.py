@@ -11,6 +11,7 @@ class FchkInterpreter:
         self._hessian = None
         self._cartesians = None  # dictionary of cartesian coordinates keyed by (x, y) distances
         self._gradient = None
+        self._MP2Energy = None
         self._atomicmasses = None
 
     @property
@@ -30,6 +31,12 @@ class FchkInterpreter:
         if self._gradient is None:
             self._gradient = self.get_grad()
         return self._gradient
+
+    @property
+    def MP2Energy(self):
+        if self._MP2Energy is None:
+            self._MP2Energy = self.get_MP2energy()
+        return self._MP2Energy
 
     @property
     def atomicmasses(self):
@@ -69,6 +76,13 @@ class FchkInterpreter:
                 parse = reader.parse("Gradient")
             grad = parse["Gradient"]
         return grad
+
+    def get_MP2energy(self):
+        for fchk in self.fchks:
+            with GaussianFChkReader(fchk) as reader:
+                parse = reader.parse("MP2 Energy")
+            ens = parse["MP2 Energy"]
+        return ens
 
     def get_mass(self):
         for fchk in self.fchks:

@@ -124,7 +124,7 @@ def plot_TDM(dipoles, ohWfns, transition="0 -> 1"):  # fix this
 
 # expand the transition dipole moment into a matrix representation so that it can be used to solve for intensity
 def calc_TDM_matrix(dirname, Rmins_fn, Renergies_fn, eqdip_fn, deriv_fn, npz_fn, size=15, transition="0 -> 1"):
-    from scaledCoefs import calc_coefs, calc_sin_coefs
+    from scaleTORpotentials import calc_coefs, calc_sin_coefs
     from FourierExpansions import calcHam, calc_sinHam
     grid, OHwfns, OHdips = interpDW(dirname, Rmins_fn, Renergies_fn,
                                     npz_fn=npz_fn, eqdip_fn=eqdip_fn, deriv_fn=deriv_fn)

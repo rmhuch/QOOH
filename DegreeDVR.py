@@ -30,11 +30,9 @@ def run_OH_DVR(cut_dict, extrapolate=0, NumPts=1000, desiredEnergies=3, plotPhas
         energies_array[j, :] = ens
         wavefunctions_array[j, :, :] = res.wavefunctions.wavefunctions
     epsilon_pots = np.column_stack((degrees, energies_array[:, :desiredEnergies+1]))
-    epsilon_sort = np.argsort(epsilon_pots[:, 0])
-    sort_epsilon_pots = epsilon_pots[epsilon_sort, :]
     # data saved in wavenumbers/degrees
     wavefuns_array = wfn_flipper(wavefunctions_array, plotPhasedWfns=plotPhasedWfns, pot_array=potential_array)
-    return potential_array, sort_epsilon_pots, wavefuns_array
+    return potential_array, epsilon_pots, wavefuns_array
 
 def calcFreqs(epsilonPots):
     Ens = epsilonPots[:, 1:]

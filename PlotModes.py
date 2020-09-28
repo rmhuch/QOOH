@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from Converter import Constants
+# NEEDS UPDATING
 
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
@@ -15,7 +16,7 @@ def loadModeData(mode, freqdir, modedir):
     for i in x:
         # f"tbhp_eq_{i}oh_freqs.dat"
         f.append(np.loadtxt(os.path.join(freqdir, f"tbhp_eq_v{i}_freqs.dat")))
-        m.append(np.loadtxt(os.path.join(modedir, f"tbhp_eq_v{i}_modes.dat"))[1:, :])
+        m.append(np.loadtxt(os.path.join(modedir, f"tbhp_eq_v{i}_modes.dat")))
     freqarray = np.array(f)  # coord x num modes array
     modearray = m
     return modearray, freqarray
@@ -93,17 +94,14 @@ def plot_OOHvsrOH(data, vals, modedir, filename=None):
         else:
             one.append([x, int(modes[0]), (contribDict[val][0, 1]*100), freqs[i, int(modes[0])]])
     one = np.array(one)
-    two = np.array(two)
 
     f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
     ax2.plot(one[:, 0], one[:, 3], "ro")
-    # ax2.plot(two[:, 0], two[:, 3], "bo")
     ax2.axes.set_ylim(1300, 1600)
     ax2.axes.set_ylabel(r"OOH Bend Frequency (cm$^{-1}$)")
     ax2.axes.set_xlabel(r"rOH ($\AA$)")
 
     ax.plot(one[:, 0], one[:, 2], "ro")
-    # ax.plot(two[:, 0], two[:, 2], "bo")
     ax.tick_params(labelbottom=True)
     ax.axes.set_ylim(30, 100)
     ax.axes.set_ylabel("OOH Bend Contribution (%)")
@@ -137,6 +135,20 @@ def plot_HarmonicZPEvsrOH(data, potfile, filename=None):
     else:
         f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
 
+def plot_g_matrix(mol_res_obj):
+    gmats = mol_res_obj.Gmatrix[0]
+    for level in np.arange(gmats.shape[0]):
+        plt.plot(gmats[level, :, 0], Constants.convert(gmats[level, :, 1], "wavenumbers", to_AU=False),
+                 label=f"vOH = {level}")
+
+    new_a = np.delete(mol_res_obj.Gmatrix[1], 18, 0)
+    plt.plot(new_a[:, 0], Constants.convert(new_a[:, 1], "wavenumbers", to_AU=False),
+             "--m", label="EQ G Matrix")
+    plt.xticks(np.arange(0, 390, 30))
+    plt.xlabel("Torsion Angle (degrees)")
+    plt.ylabel(r"G-Matrix Element ($cm^{-1}$)")
+    plt.legend()
+
 
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -159,7 +171,7 @@ if __name__ == '__main__':
     vibfiles = np.arange(7)
 
     dat = loadModeData(vibfiles, VIBfreqdir, VIBmodedir)
-    potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
+    # potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
     # plot_OOvsrOH(dat, vibfiles, VIBmodedir, filename="OOFreqsvsrOH_expectation")
     # plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH_expectation")
     plot_OOHvsrOH(dat, vibfiles, VIBmodedir, filename="OOHFreqsvsrOH_expectation")

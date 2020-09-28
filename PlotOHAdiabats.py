@@ -1,11 +1,13 @@
-from FourierExpansions import *  # don't need the other import statements bc they are at the top of FourierExpansions.py
+import matplotlib.pyplot as plt
+import numpy as np
+from Converter import Constants
 
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
           'font.size': 14}
 plt.rcParams.update(params)
 
-def make_Wfnplots(resDicts, doublet="lower", filename=None):
+def make_Wfnplots(resDicts, wfnns, doublet="lower", filename=None):
     """To do this we will make a broken axis plot.. good to keep in back pocket.."""
     # 'break' the y-axis into two portions - use the top (ax) for the upper level (resDicts[n])
     # and the bottom (ax2) for the lower level (resDicts[0])
@@ -13,21 +15,19 @@ def make_Wfnplots(resDicts, doublet="lower", filename=None):
     for i, resDict in enumerate(resDicts):
         # complete analysis and gather data
         x = np.linspace(0, 360, 100)
-        rad_x = np.linspace(0, 2*np.pi, 100)
-        wfnns = PORwfns(resDict["eigvecs"], rad_x)
         if doublet == "lower":
             en0 = Constants.convert(resDict['energy'][0], "wavenumbers", to_AU=False)
             if i == 0:
-                wfn0 = en0 + wfnns[:, 0]*-10  # *10 for aestheics only (on all wfn)
+                wfn0 = en0 + wfnns[i][:, 0]*-10  # *10 for aestheics only (on all wfn)
             else:
-                wfn0 = en0 + wfnns[:, 0] * 10  # *10 for aestheics only (on all wfn)
+                wfn0 = en0 + wfnns[i][:, 0] * 10  # *10 for aestheics only (on all wfn)
             en1 = Constants.convert(resDict['energy'][1], "wavenumbers", to_AU=False)
-            wfn1 = en1 + wfnns[:, 1]*10
+            wfn1 = en1 + wfnns[i][:, 1]*10
         elif doublet == "upper":
             en0 = Constants.convert(resDict['energy'][2], "wavenumbers", to_AU=False)
-            wfn0 = en0 + wfnns[:, 2]*10
+            wfn0 = en0 + wfnns[i][:, 2]*10
             en1 = Constants.convert(resDict['energy'][3], "wavenumbers", to_AU=False)
-            wfn1 = en1 + wfnns[:, 3]*10
+            wfn1 = en1 + wfnns[i][:, 3]*10
         else:
             raise Exception(f"Can't evaluate a {doublet} doublet.")
 
@@ -77,12 +77,12 @@ def make_Wfnplots(resDicts, doublet="lower", filename=None):
 def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     """ Plot the potential curves and energy levels of the given transitions. If ZPE plots include the ZPE,
     else they are plotted with the ZPE subtracted off so that min(gsPot) = 0 """
+    from FourierExpansions import calc_curves
     f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
     x = np.linspace(0, 360, 100)
     rad_x = np.linspace(0, 2*np.pi, 100)
     # create gs plot
-    gsPot = Constants.convert(evaluatePot(gsRes["V"], rad_x), "wavenumbers", to_AU=False)
-    gsPotshift = gsPot - min(gsPot)
+    gsPot = Constants.convert(calc_curves(rad_x, gsRes["V"]), "wavenumbers", to_AU=False)
     en0 = Constants.convert(gsRes['energy'][0], "wavenumbers", to_AU=False)
     en1 = Constants.convert(gsRes['energy'][1], "wavenumbers", to_AU=False)
     en2 = Constants.convert(gsRes['energy'][2], "wavenumbers", to_AU=False)
@@ -95,6 +95,7 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
         ax2.plot(enX, np.repeat(en2, len(enX)), "-g", linewidth=2.5)
         ax2.plot(enX, np.repeat(en3, len(enX)), "--", color="indigo", linewidth=2.5)
     else:
+        gsPotshift = gsPot - min(gsPot)
         ax2.plot(x, gsPotshift, '-k', linewidth=2.5)
         ax2.plot(enX, np.repeat(en0 - min(gsPot), len(enX)), "-r", linewidth=2.5)
         ax2.plot(enX, np.repeat(en1 - min(gsPot), len(enX)), "--b", linewidth=2.5)
@@ -102,8 +103,7 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
         ax2.plot(enX, np.repeat(en3 - min(gsPot), len(enX)), "--", color="indigo", linewidth=2.5)
 
     # create es plot
-    esPot = Constants.convert(evaluatePot(esRes["V"], rad_x), "wavenumbers", to_AU=False)
-    esPotshift = esPot - min(gsPot)  # subtract off ZPE
+    esPot = Constants.convert(calc_curves(rad_x, esRes["V"]), "wavenumbers", to_AU=False)
     en0 = Constants.convert(esRes['energy'][0], "wavenumbers", to_AU=False)
     en1 = Constants.convert(esRes['energy'][1], "wavenumbers", to_AU=False)
     en2 = Constants.convert(esRes['energy'][2], "wavenumbers", to_AU=False)
@@ -116,6 +116,7 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
         ax.plot(enX, np.repeat(en2, len(enX)), "-g", linewidth=2.5)
         ax.plot(enX, np.repeat(en3, len(enX)), "--", color="indigo", linewidth=2.5)
     else:
+        esPotshift = esPot - min(gsPot)  # subtract off ZPE
         ax.plot(x, esPotshift, '-k', linewidth=2.5)
         ax.plot(enX, np.repeat(en0 - min(gsPot), len(enX)), "-r", linewidth=2.5)
         ax.plot(enX, np.repeat(en1 - min(gsPot), len(enX)), "--b", linewidth=2.5)
@@ -148,8 +149,19 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     else:
         f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
 
+def make_scaledPots(mol_res_obj):
+    from FourierExpansions import calc_curves
+    x = np.linspace(0, 2 * np.pi, 100)
+    Vel = calc_curves(x, mol_res_obj.Velcoefs)
+    newVel = mol_res_obj.Vcoeffs["Vel"]  # MolecularResults hold coefficient dict for 1 specific pot/scaling
+    Vel_scaled = calc_curves(x, newVel)
+    Vel_wave = Constants.convert(Vel, "wavenumbers", to_AU=False)
+    Vel_scaled_wave = Constants.convert(Vel_scaled, "wavenumbers", to_AU=False)
+    plt.plot(x, Vel_scaled_wave, "-g", label=f"Scaled Energy with Barrier {mol_res_obj.barrier_height} $cm^-1$")
+    plt.plot(x, Vel_wave, "-k", label=f"Electronic Energy + R Path")
+    plt.show()
+
 if __name__ == '__main__':
     Eres, res = run(levs_to_calc=3)
     # make_Wfnplots(res, doublet="lower", filename="VOH02_wfns")
-    make_Potplots(res[0], res[2], filename="vOH02_wZPE")
     make_Potplots(res[0], res[2], ZPE=False, filename="vOH02_woZPE")

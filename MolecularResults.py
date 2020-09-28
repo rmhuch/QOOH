@@ -3,13 +3,15 @@ import os
 
 class MoleculeInfo:
     def __init__(self, MoleculeName, atom_array, eqTORangle, oh_scan_npz=None,
-                 ModeFchkDirectory=None, ModeFiles=None):
+                 TorFchkDirectory=None, TorFiles=None, ModeFchkDirectory=None, ModeFiles=None):
         self.MoleculeName = MoleculeName
         self.atom_array = atom_array
         self.eqTORangle = eqTORangle
         self.oh_scan_npz = oh_scan_npz
-        self.ModeFchkDirectory = ModeFchkDirectory
-        self.ModeFiles = ModeFiles
+        self.TorFchkDirectory = TorFchkDirectory  # to calculate Vel + rxn path
+        self.TorFiles = TorFiles
+        self.ModeFchkDirectory = ModeFchkDirectory  # to calculate modes from rxn path
+        self.ModeFiles = ModeFiles  # must be proper file names as str not just changing piece
         self._MoleculeDir = None
         self._mass_array = None
         self._PES_DegreeDict = None
@@ -100,6 +102,7 @@ class MoleculeResults:
         self._TORmodes = None
         self._PotentialCoeffs = None
         self._Gmatrix = None
+        self._RxnPathResults = None
         self._PORresults = None
         self._TransitionIntensities = None
         self._OscillatorStrength = None
@@ -111,8 +114,9 @@ class MoleculeResults:
                                        f"{self.MoleculeInfo.MoleculeName}_vOH_DVRresults_{self.DVRparams['num_pts']}.npz")
             if os.path.exists(resultspath):
                 self._DegreeDVRresults = np.load(resultspath)
+                print(f"Degree DVR Results loaded from {resultspath}")
             else:
-                results = self.run_DVR()
+                results = self.run_degree_DVR()
                 self._DegreeDVRresults = np.load(results)
         return self._DegreeDVRresults
 
@@ -122,7 +126,13 @@ class MoleculeResults:
             self._Gmatrix = self.run_gmatrix()
         return self._Gmatrix
 
-    def run_DVR(self):
+    @property
+    def RxnPathResults(self):
+        if self._RxnPathResults is None:
+            self._RxnPathResults = self.run_reaction_path()
+        return self._RxnPathResults
+
+    def run_degree_DVR(self):
         from DegreeDVR import run_OH_DVR, calcFreqs
         params = self.DVRparams
         potential_array, epsilon_pots, wavefuns_array = run_OH_DVR(self.MoleculeInfo.PES_DegreeDict,
@@ -132,30 +142,74 @@ class MoleculeResults:
                                                                    extrapolate=params["extrapolate"])
         freqs = calcFreqs(epsilon_pots)
         npz_name = f"{self.MoleculeInfo.MoleculeName}_vOH_DVRresults_{params['num_pts']}.npz"
-        np.savez(os.path.join(self.MoleculeInfo.MoleculeDir, npz_name),
+        np.savez(os.path.join(self.MoleculeInfo.MoleculeDir, npz_name), potential=potential_array,
                  frequencies=freqs, energies=epsilon_pots, wavefunctions=wavefuns_array)
         print(f"DVR Results saved to {npz_name} in {self.MoleculeInfo.MoleculeDir}")
         return os.path.join(self.MoleculeInfo.MoleculeDir, npz_name)
 
     def run_gmatrix(self):
         from ExpectationValues import run_DVR
-        from Gmatrix import get_tor_gmatrix
+        from Gmatrix import get_tor_gmatrix, get_eq_g
         Epot_array = self.MoleculeInfo.eqPES
         params = self.DVRparams
         ens, rOH_wfns = run_DVR(Epot_array, NumPts=params["num_pts"], desiredEnergies=params["desired_energies"],
                                 extrapolate=params["extrapolate"])
         tor_angles = self.MoleculeInfo.PES_DegreeDict.keys()
         mass_array = self.MoleculeInfo.mass_array
-        tor_masses = np.array((mass_array[0], mass_array[4], mass_array[5], mass_array[6]))
+        tor_masses = np.array((mass_array[6], mass_array[4], mass_array[5], np.inf)) 
         res = get_tor_gmatrix(rOH_wfns, tor_angles, self.MoleculeInfo.InternalCoordDict, tor_masses)
-        return res  # an array of gmatrix values [level,[num tor points, gmatrix element]]
-
-    def run_tor_adiabats(self):
-        ...
+        eq_g = get_eq_g(tor_angles, self.MoleculeInfo.InternalCoordDict, tor_masses)
+        return res, eq_g
 
     def run_reaction_path(self):
-        from ReactionPath import run
+        from ReactionPath import run_energies
+        fchkDir = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.TorFchkDirectory)
+        rxn_path_res = run_energies(fchkDir, self.MoleculeInfo.TorFiles)
+        return rxn_path_res
+
+    def calculate_VelwZPE(self):
+        from Converter import Constants
+        from FourierExpansions import calc_cos_coefs
+        degree_vals = np.linspace(0, 360, len(self.MoleculeInfo.TorFiles))
+        norm_grad_2 = self.RxnPathResults["norm_grad_2"]
+        idx = np.where(norm_grad_2[:, 1] > 5E-8)
+        new_degree = degree_vals[idx]
+        Vel = self.RxnPathResults["electronicE"][:, 1]
+        new_Vel = Vel[idx]
+        Vel_ZPE = np.zeros((len(new_degree), 2))
+        for i, j in enumerate(new_degree):
+            freqs = self.RxnPathResults[j]["freqs"]
+            nonzero_freqs = freqs[7:-1]  # throw out translations/rotations and OH frequency
+            nonzero_freqs_har = Constants.convert(nonzero_freqs, "wavenumbers", to_AU=True)
+            ZPE = np.sum(nonzero_freqs_har)/2
+            Vel_ZPE[i] = np.column_stack((np.radians(j), new_Vel[i] + ZPE))
+        Vel_ZPE[:, 1] -= min(Vel_ZPE[:, 1])
+        VelwZPE_coeffs = calc_cos_coefs(Vel_ZPE)
+        return VelwZPE_coeffs
+
+    def run_reaction_path_for_modes(self, save_file_header):
+        from ReactionPath import run_modes
         for i in self.MoleculeInfo.ModeFiles:
-            fname = os.path.join(self.MoleculeInfo.ModeFchkDirectory, i)
-            run(fname, i)
+            fname = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.ModeFchkDirectory, i)
+            run_modes(fname, save_file_header)
         # this saves frequency and mode dat files
+
+    def make_OOHfreq_plot(self, rOH, freq_dir_name, mode_dir_name, vibfile_handles, fig_filename):
+        # COME BACK TO THIS. VERY VERY SLOPPY IMPLEMENTATION
+        from PlotModes import loadModeData, plot_OOHvsrOH
+        VIBfreqdir = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.ModeFchkDirectory, freq_dir_name)
+        VIBmodedir = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.ModeFchkDirectory, mode_dir_name)
+        dat = loadModeData(vibfile_handles, VIBfreqdir, VIBmodedir)
+        plot_OOHvsrOH(dat, vibfile_handles, VIBmodedir, fig_filename)
+
+    def run_tor_adiabats(self):
+        from TorsionPOR import POR
+        if "barrier_height" in self.PORparams:
+            PORobj = POR(DVR_res=self.DegreeDVRresults, g_matrix=self.Gmatrix[0], Velcoeffs=self.calculate_VelwZPE(),
+                         HamSize=self.PORparams["HamSize"], barrier_height=self.PORparams["barrier_height"])
+        else:
+            PORobj = POR(DVR_res=self.DegreeDVRresults, g_matrix=self.Gmatrix[0], Velcoeffs=self.calculate_VelwZPE(),
+                         HamSize=self.PORparams["HamSize"])
+        results = PORobj.solveHam()  # returns a list of dictionaries for each torsional potential
+        wfns = PORobj.PORwfns()  # returns a list of arrays with each wfn for each torsional potential
+        return results, wfns
