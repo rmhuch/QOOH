@@ -14,6 +14,17 @@ def calc_cos_coefs(energy_dat):
     popt, pcov = optimize.curve_fit(cos_func, energy_dat[:, 0], energy_dat[:, 1])
     return popt
 
+def cos4_func(x, c0, c1, c2, c3, c4):
+    """returns a 6th order cos function based off passed x (angle values IN RADIANS)
+    and coefficients from calc_cos_coefs"""
+    return c0 + c1*np.cos(x) + c2*np.cos(2*x) + c3*np.cos(3*x) + c4*np.cos(4*x)
+
+def calc_4cos_coefs(energy_dat):
+    """conducts a cos expansion to fit the energy curve given, returns sixth order coefs.
+        :param energy_dat: [coordinate (RADIANS), energy]"""
+    popt, pcov = optimize.curve_fit(cos4_func, energy_dat[:, 0], energy_dat[:, 1])
+    return popt
+
 def sin_func(x, c0, c1, c2, c3, c4, c5, c6):
     """returns a 6th order sin function based off passed x (angle values IN RADIANS)
     and coefficients from calc_sin_coefs"""
@@ -29,6 +40,8 @@ def calc_curves(x, coefs, function="cos"):
     """calculates and plots the expansion based off passed x (angle values IN RADIANS) and coefficients"""
     if function == "cos":
         energies = cos_func(x, *coefs)
+    elif function == "4cos":
+        energies = cos4_func(x, *coefs)
     elif function == "sin":
         energies = sin_func(x, *coefs)
     else:

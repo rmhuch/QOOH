@@ -30,6 +30,7 @@ def get_tor_gmatrix(rOH_wfns, tor_angles, internal_coords, masses):
         TBHP/QOOH: 1-H, 2-O, 3-O, 4-C"""
     # this calculates the gmatrix element for the torsion as a function of the roh expectation value
     # masses is in atomic units!
+    import matplotlib.pyplot as plt
     expectation_array = calc_rOH_expectation(rOH_wfns)
     internal_dict = get_bonds_angles(tor_angles, internal_coords)
     g_matrix = np.zeros((len(expectation_array[:, 0]), len(tor_angles), 2))  # [level,[num tor points, gmatrix element]]
@@ -47,6 +48,13 @@ def get_tor_gmatrix(rOH_wfns, tor_angles, internal_coords, masses):
                                           2 * (np.cos(ic["tau1234"])/ic["r23"]) * \
                                           ((lambda_123/masses[1])*1/np.tan(ic["phi234"]) +
                                             (lambda_432/masses[2])*1/np.tan(ic["phi123"]))
+        plt.plot(g_matrix[int(level), :, 0], Constants.convert(g_matrix[int(level), :, 1], "wavenumbers", to_AU=False),
+                 label=f"{level}$nu_OH$")
+        print(np.column_stack((g_matrix[int(level), :, 0], Constants.convert(g_matrix[int(level), :, 1],
+                                                                             "wavenumbers", to_AU=False))))
+    plt.xlabel("Torsion")
+    plt.ylabel("G-Matrix (cm^-1)")
+    plt.show()
     return g_matrix
 
 def get_eq_g(tor_angles, internal_coords, masses):

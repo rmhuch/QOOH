@@ -18,6 +18,7 @@ def run_DVR(Epot_array, extrapolate=0, NumPts=1000, desiredEnergies=3):
     ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
     energies_array = ens  # wavenumbers
     wavefunctions_array = np.column_stack((res.grid, res.wavefunctions.wavefunctions))  # bohr
+    # np.savetxt("EqTOR_wfns_forMark.dat", wavefunctions_array)
     return energies_array, wavefunctions_array
 
 def calc_expectation(dvr_wavefunctions):

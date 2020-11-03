@@ -193,6 +193,19 @@ def newFMatrix(data):
     f_prime = (np.identity(len(p_prime))-p_prime) @ mwF_mat @ (np.identity(len(p_prime))-p_prime)
     return f_prime
 
+def run_transrotproj(fchkfile):
+    res_dict = dict()
+    data = DataClass(fchkfile)
+    forcies = transrotOnlyFMatrix(data)
+    freqs2, qn = np.linalg.eigh(forcies)
+    coords = COMcoords(data, massweight=False)
+    # save modes & freqs in dictionary
+    res_dict["modes"] = np.row_stack((coords.flatten(), qn.T))
+    res_dict["freqs"] = np.sign(freqs2) * Constants.convert(np.sqrt(np.abs(freqs2)), "wavenumbers", to_AU=False)
+    res_dict["electronicE"] = data.MP2Energy
+    res_dict["norm_grad"] = np.linalg.norm(data.gradient)
+    return res_dict  # returns dictionary, keyed by string of values
+
 def run_modes(fchk_names, fn):
     data = DataClass(fchk_names)
     forcies = newFMatrix(data)
@@ -205,7 +218,7 @@ def run_modes(fchk_names, fn):
 def run_energies(fchk_dir, fchk_names):
     res_dict = dict()
     electronicE = np.zeros((len(fchk_names), 2))
-    norm_grad_2 = np.zeros((len(fchk_names), 2))
+    norm_grad = np.zeros((len(fchk_names), 2))
     degree_vals = np.linspace(0, 360, len(fchk_names))
     for i, j, k in zip(np.arange(len(degree_vals)), degree_vals, fchk_names):
         degree_dict = dict()
@@ -217,13 +230,22 @@ def run_energies(fchk_dir, fchk_names):
         # save modes & freqs in nested dictionary keyed by degree value
         degree_dict["modes"] = np.row_stack((coords.flatten(), qn.T))
         degree_dict["freqs"] = np.sign(freqs2) * Constants.convert(np.sqrt(np.abs(freqs2)), "wavenumbers", to_AU=False)
-        # save electronicE and norm(gradient)**2 to res_dict when full
+        # save electronicE and norm(gradient) to res_dict when full
         electronicE[i] = np.column_stack((int(j), data.MP2Energy))
-        norm_grad_2[i] = np.column_stack((int(j), np.linalg.norm(data.gradient)**2))
+        norm_grad[i] = np.column_stack((int(j), np.linalg.norm(data.gradient)))
         res_dict[int(j)] = degree_dict
     res_dict["electronicE"] = electronicE
-    res_dict["norm_grad_2"] = norm_grad_2
-    return res_dict  # returns dictionary, keyed by tor angles, also with electronicE and norm(gradient)**2 keys
+    res_dict["norm_grad"] = norm_grad
+    return res_dict  # returns dictionary, keyed by tor angles, also with electronicE and norm(gradient) keys
+
+def run_Emil_energies(datfile):
+    data = np.loadtxt(datfile)
+    # delta_OH = data[1:, 0]
+    # eq_OH = np.array((0.9653, 0.9666, 0.9645, 0.9638, 0.9637, 0.9638, 0.9645, 0.9666, 0.9653))
+    tor_angle = data[0, 1:]
+    energies = data[1:, 1:]
+    electronicE = np.column_stack((tor_angle, energies[8, :]))
+    return electronicE  # returns array, [angles, electronicE]
 
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
