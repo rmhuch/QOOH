@@ -23,9 +23,9 @@ def loadModeData(mode, freqdir, modedir):
 
 def plot_OOfreqsAC(data):
     """Plots frequencies to look at avoided crossings"""
-    rOH = np.arange(0.9, 1.7, 0.1)
+    rOH = np.array((0.98149, 1.01601, 1.05222, 1.09009, 1.12931, 1.17051, 1.21424))
     for num, mode in enumerate(data[1].T):  # for each mode in the array
-        if 18 <= num <= 23:
+        if 39 <= num <= 48:
             plt.plot(rOH, mode, label=f"Mode {num+1}")
         else:
             pass
@@ -154,25 +154,26 @@ if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
     OHdir = os.path.join(udrive, "TBHP", "eq_scans")
-    # OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
-    # OHmodedir = os.path.join(OHdir, "oh_modes")
-    # OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
-    # OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
+    OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
+    OHmodedir = os.path.join(OHdir, "oh_modes")
+    OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
+    OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
     #
-    # dat = loadModeData(OHvals, OHfreqdir, OHmodedir)
+    dat = loadModeData(OHvals, OHfreqdir, OHmodedir)
     # potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
     # plot_OOvsrOH(dat, OHvals, OHmodedir, filename="OOFreqsvsrOH")
     # plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH")
-    # plot_OOHvsrOH(dat, OHvals, OHmodedir, filename="OOHFreqsvsrOH")
+    plot_OOHvsrOH(dat, OHvals, OHmodedir, filename="OOHFreqsvsrOH")
+    # come back to this!!!!
 
-    VIBdir = os.path.join(udrive, "TBHP", "VibStateFchks")
-    VIBfreqdir = os.path.join(VIBdir, "vib_state_mode_freqs")
-    VIBmodedir = os.path.join(VIBdir, "vib_state_modes")
-    vibfiles = np.arange(7)
+    # VIBdir = os.path.join(udrive, "TBHP", "VibStateFchks")
+    # VIBfreqdir = os.path.join(VIBdir, "vib_state_mode_freqs")
+    # VIBmodedir = os.path.join(VIBdir, "vib_state_modes")
+    # vibfiles = np.arange(7)
 
-    dat = loadModeData(vibfiles, VIBfreqdir, VIBmodedir)
+    # dat = loadModeData(vibfiles, VIBfreqdir, VIBmodedir)
     # potfile = os.path.join(OHdir, "eq_PotentialEnergy.txt")
     # plot_OOvsrOH(dat, vibfiles, VIBmodedir, filename="OOFreqsvsrOH_expectation")
     # plot_HarmonicZPEvsrOH(dat, potfile, filename="HarmonicZPEvsrOH_expectation")
-    plot_OOHvsrOH(dat, vibfiles, VIBmodedir, filename="OOHFreqsvsrOH_expectation")
-
+    # plot_OOHvsrOH(dat, vibfiles, VIBmodedir, filename="OOHFreqsvsrOH_expectation")
+    # plot_OOfreqsAC(dat)

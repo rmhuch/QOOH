@@ -139,12 +139,12 @@ class MoleculeResults:
     @property
     def Gmatrix(self):
         if self._Gmatrix is None:
-            resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
-                                       f"{self.MoleculeInfo.MoleculeName}_Gmatrix_elements.npz")
-        #     if os.path.exists(resultspath):
-        #         self._Gmatrix = np.load(resultspath)
-        #     else:
-            print(f"{resultspath} not found. Beginning Gmatrix calculation")
+            # resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+            #                            f"{self.MoleculeInfo.MoleculeName}_Gmatrix_elements.npz")
+            # if os.path.exists(resultspath):
+            #     self._Gmatrix = np.load(resultspath)
+            # else:
+            #     print(f"{resultspath} not found. Beginning Gmatrix calculation")
             results = self.run_gmatrix()
             self._Gmatrix = np.load(results)
         return self._Gmatrix
@@ -261,6 +261,7 @@ class MoleculeResults:
         ZPE_dict = dict()
         for i, j in enumerate(degree_vals):
             freqs = self.RxnPathResults[j]["freqs"]  # in hartree
+            print(np.column_stack((j, freqs[-1])))
             nonzero_freqs = freqs[7:-1]  # throw out translations/rotations and OH frequency
             nonzero_freqs_har = Constants.convert(nonzero_freqs, "wavenumbers", to_AU=True)
             ZPE = np.sum(nonzero_freqs_har)/2
@@ -307,20 +308,97 @@ class MoleculeResults:
         np.save(os.path.join(self.MoleculeInfo.MoleculeDir, npy_name), VelwZPE_coeffs)
         return os.path.join(self.MoleculeInfo.MoleculeDir, npy_name)
 
-    # def run_reaction_path_for_modes(self, save_file_header):
-    #     from ReactionPath import run_modes
-    #     for i in self.MoleculeInfo.ModeFiles:
-    #         fname = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.ModeFchkDirectory, i)
-    #         run_modes(fname, save_file_header)
-    #     # this saves frequency and mode dat files
-    #
-    # def make_OOHfreq_plot(self, rOH, freq_dir_name, mode_dir_name, vibfile_handles, fig_filename):
-    #     # COME BACK TO THIS. VERY VERY SLOPPY IMPLEMENTATION
-    #     from PlotModes import loadModeData, plot_OOHvsrOH
-    #     VIBfreqdir = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.ModeFchkDirectory, freq_dir_name)
-    #     VIBmodedir = os.path.join(self.MoleculeInfo.MoleculeDir, self.MoleculeInfo.ModeFchkDirectory, mode_dir_name)
-    #     dat = loadModeData(vibfile_handles, VIBfreqdir, VIBmodedir)
-    #     plot_OOHvsrOH(dat, vibfile_handles, VIBmodedir, fig_filename)
+    def make_diff_freq_plots(self):
+        from FourierExpansions import calc_cos_coefs, calc_curves
+        import matplotlib.pyplot as plt
+        params = {'text.usetex': False,
+                  'mathtext.fontset': 'dejavusans',
+                  'font.size': 14}
+        plt.rcParams.update(params)
+        degree1 = np.arange(10, 110, 10)
+        degree4 = np.arange(120, 180, 10)
+        degree2 = np.arange(190, 250, 10)
+        degree3 = np.arange(260, 360, 10)
+        degrees = np.concatenate((degree1, degree4, degree2, degree3))
+        freq_data = np.zeros((len(degrees), 49))
+        sel = [x for x in range(49) if x not in list(range(8)) + [29, 48]]
+        for i, deg in enumerate(degrees):  # pull the frequencies
+            freqs = self.RxnPathResults[deg]["freqs"]
+            freq_data[i] = np.column_stack((deg, *freqs))
+        # add in data from Mark
+        dat = np.loadtxt("stat_no_tor_tor_freqs.csv", delimiter=",")
+        freq_data = np.concatenate((freq_data, dat), axis=0)
+        sym_dict = dict()
+        for idx, deg in enumerate(freq_data[:, 0]):  # symmeterize the frequencies
+            if deg > 180:
+                friend = 180 - (deg - 180)
+            else:
+                friend = 180 + (180 - deg) 
+            pos = np.where(freq_data[:, 0] == friend)[0]
+            if len(pos) == 0:
+                sym_dict[deg] = freq_data[idx, 1:]
+                sym_dict[friend] = freq_data[idx, 1:]
+            else:
+                val1 = freq_data[idx, 1:]
+                val2 = freq_data[pos[0], 1:]
+                sym_dict[deg] = (val1 + val2) / 2
+                sym_dict[friend] = (val1 + val2) / 2
+        sym_data = np.column_stack([list(sym_dict.keys()), list(sym_dict.values())])
+        key_idxs = np.argsort(list(sym_dict.keys()))
+        sym_data = sym_data[key_idxs]
+        # subtract eq frequencies and divide by 2 for ZPE
+        eq_freqs = np.loadtxt("no_tor_tor_freqs.csv", delimiter=",")
+        plt_sym_data = np.zeros((len(sym_data), 49))
+        plt_sym_data[:, 0] = sym_data[:, 0]
+        for i in np.arange(1, sym_data.shape[1]):
+            plt_sym_data[:, i] = (sym_data[:, i] - eq_freqs[i-1])/2
+        # fit OOH and OH to cos function expansions
+        x_deg = np.arange(10, 351, 1)
+        x_rad = np.radians(x_deg)
+        eq_idx = np.argwhere(x_deg == 112)[0]
+        OOH = plt_sym_data[:, 29]
+        OOH_coefs = calc_cos_coefs(np.column_stack([np.radians(plt_sym_data[:, 0]), OOH]))
+        yOOH = calc_curves(x_rad, OOH_coefs)
+        yOOH -= yOOH[eq_idx[0]]
+        plt.plot(x_deg, yOOH, "-r", linewidth=2.5, zorder=50, label="OOH Bend")
+        # plt.plot(plt_sym_data[:, 0], OOH, "--r", linewidth=2.5, zorder=50, label="OOH Bend")
+        OH = plt_sym_data[:, 48]
+        OH_coefs = calc_cos_coefs(np.column_stack([np.radians(plt_sym_data[:, 0]), OH]))
+        yOH = calc_curves(x_rad, OH_coefs)
+        yOH -= yOH[eq_idx[0]]
+        plt.plot(x_deg, yOH, "-g", linewidth=2.5, zorder=50, label="OH Stretch")
+        # plt.plot(plt_sym_data[:, 0], OH, "--g", linewidth=2.5, zorder=50, label="OH Stretch")
+        # for i in sel:
+        #     plt.plot(plt_sym_data[:, 0], plt_sym_data[:, i], color="gray", linewidth=1.5)
+        # plot sum of modes - OOH and OH
+        eq_freqss = np.concatenate([[1000], eq_freqs])
+        eq_sum = np.sum(eq_freqss[sel])
+        mode_y = np.zeros(len(plt_sym_data))
+        for j, d in enumerate(plt_sym_data[:, 0]):
+            mode_sum = np.sum(sym_data[j, sel])
+            mode_y[j] = (mode_sum-eq_sum)/2
+        y_coeffs = calc_cos_coefs(np.column_stack([np.radians(plt_sym_data[:, 0]), mode_y]))
+        y_vals = calc_curves(x_rad, y_coeffs)
+        y_vals -= y_vals[eq_idx[0]]
+        plt.plot(x_deg, y_vals, color="k", linewidth=2.5, label=r"$\Delta$ZPE - OOH Bend - OH Stretch")
+        # # pot sum of modes - OH
+        # mode_y2 = np.zeros(len(plt_sym_data))
+        # sel2 = [x for x in range(49) if x not in list(range(8)) + [48]]
+        # eq_sum2 = np.sum(eq_freqss[sel2])
+        # for j, d in enumerate(plt_sym_data[:, 0]):
+        #     mode_sum = np.sum(sym_data[j, sel2])
+        #     mode_y2[j] = (mode_sum-eq_sum2)/2
+        # y_coeffs2 = calc_cos_coefs(np.column_stack([np.radians(plt_sym_data[:, 0]), mode_y2]))
+        # y_vals2 = calc_curves(np.radians(np.arange(10, 351, 1)), y_coeffs2)
+        # plt.plot(np.arange(10, 351, 1), y_vals2, color="k", linewidth=2.5, label=r"$\Delta$ZPE - OH Stretch")
+
+        plt.legend()
+        plt.xticks(np.arange(30, 330, 30))
+        plt.xlim(30, 330)
+        plt.xlabel(r"$\tau$ [Degrees]")
+        plt.ylim(-30, 30)
+        plt.ylabel(r"$\Delta$ ZPE [wavenumbers]")
+        plt.show()
 
     def run_tor_adiabats(self):
         from TorsionPOR import POR

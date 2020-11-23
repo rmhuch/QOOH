@@ -32,7 +32,7 @@ tbhp_res_obj = MoleculeResults(MoleculeInfo_obj=tbhp,
                                           "Vexpansion": "sixth"},  # add "barrier_height" : ... to scale(one at a time)
                                Intenseparams={"numGstates": 4,
                                               "numEstates": 6},
-                               transition=[f"0->{i}" for i in [2, 3, 4, 5]])
+                               transition=[f"0->{i}" for i in [1, 2, 3, 4, 5]])
 
 def run_pot_plots():
     res, wfns = tbhp_res_obj.PORresults
@@ -291,7 +291,26 @@ def make_Vel_plots(mol_res_obj):
     plt.plot(np.arange(0, 360, 1), Constants.convert(velZPE, "wavenumbers", to_AU=False))
     plt.show()
 
+def make_Intensity_plots(mol_res_obj):
+    from PlotOHAdiabats import make_PotWfnplots, make_one_Potplot, make_Potplots
+    TMobj = TransitionMoments(mol_res_obj.DegreeDVRresults, mol_res_obj.PORresults, mol_res_obj.MoleculeInfo,
+                                          transition=[f"0->{i}" for i in np.arange(1, 6)], MatSize=mol_res_obj.PORparams["HamSize"])
+    # TMobj.plot_TDM(filename=os.path.join(tbhp.MoleculeDir, "figures", "TDM"))
+    res, wfns = mol_res_obj.PORresults
+    # make_one_Potplot(res[0], ZPE=False, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH0_levels"))
+    # make_Potplots(res[0], res[2], ZPE=True)
+    # make_PotWfnplots(res[0], wfns[0], ZPE=False, wfn_idx=[(0, 1), (2, 3), (4, 5)],
+    #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH0_allwfns"))
+    # for i in np.arange(1, 6):
+    #     make_PotWfnplots(res[i], wfns[i], wfn_idx=[(0, 1), (2, 3), (4, 5)],
+    #                      filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH{i}_allwfns"))
+    # make_one_Wfn_plot(res[2], wfns[2], idx=(2, 3))
+    # make_PA_plots(wfns)
+    
 if __name__ == '__main__':
+    from RotConstants import calc_all_RotConstants
+    udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    tbhp_fdir = os.path.join(udrive, "TBHP", "TorFchks")
     bhs = [None, 225, 250, 275, 300, 325]
     sf = [None, 0.9, 0.8, 0.7, 0.6, 0.5]
     TBHPexp = [186, 198, 217, 262]
@@ -299,8 +318,12 @@ if __name__ == '__main__':
     # e = run_mixed_data(type=2, plot=True)
     # a = e.TransitionIntensities
     # run_pot_plots()
-    # t = tbhp_res_obj.TransitionIntensities
     # make_Vel_plots(tbhp_res_obj)
     # run_pot_plots()
-    g = tbhp_res_obj.Gmatrix
-
+    make_Intensity_plots(tbhp_res_obj)
+    # a = tbhp_res_obj.TransitionIntensities
+    # for i in np.arange(1, 6):
+    #     calc_all_RotConstants(tbhp_fdir, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
+    #                           numstates=6,
+    #                           vOH=f"{i}")
+    a = tbhp_res_obj.Gmatrix

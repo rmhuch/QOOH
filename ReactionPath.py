@@ -5,6 +5,7 @@ from FChkInterpreter import FchkInterpreter
 from Converter import Constants
 
 def DataClass(fchk_names):
+    # all units of an fchk are in atomic units
     data = FchkInterpreter(fchk_names)
     return data
 
@@ -19,7 +20,8 @@ def COMcoords(data, massweight=True):
     """
     mass = Constants.convert(data.atomicmasses, "amu", to_AU=True)
     tot_mass = np.sum(mass)
-    coords = Constants.convert(data.cartesians, "angstroms", to_AU=True)
+    # coords = Constants.convert(data.cartesians, "angstroms", to_AU=True)
+    coords = data.cartesians
     COM = np.zeros(3)
     for i in range(3):
         mr = 0

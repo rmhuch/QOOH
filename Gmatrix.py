@@ -31,9 +31,14 @@ def get_tor_gmatrix(rOH_wfns, tor_angles, internal_coords, masses):
     # this calculates the gmatrix element for the torsion as a function of the roh expectation value
     # masses is in atomic units!
     import matplotlib.pyplot as plt
+    params = {'text.usetex': False,
+              'mathtext.fontset': 'dejavusans',
+              'font.size': 14}
+    plt.rcParams.update(params)
     expectation_array = calc_rOH_expectation(rOH_wfns)
     internal_dict = get_bonds_angles(tor_angles, internal_coords)
     g_matrix = np.zeros((len(expectation_array[:, 0]), len(tor_angles), 2))  # [level,[num tor points, gmatrix element]]
+    colors = ["m", "darkturquoise", "mediumseagreen", "indigo", "goldenrod", "r", "b"]
     for level in expectation_array[:, 0]:
         for i, angle in enumerate(tor_angles):
             g_matrix[int(level), i, 0] = angle
@@ -48,12 +53,15 @@ def get_tor_gmatrix(rOH_wfns, tor_angles, internal_coords, masses):
                                           2 * (np.cos(ic["tau1234"])/ic["r23"]) * \
                                           ((lambda_123/masses[1])*1/np.tan(ic["phi234"]) +
                                             (lambda_432/masses[2])*1/np.tan(ic["phi123"]))
-        plt.plot(g_matrix[int(level), :, 0], Constants.convert(g_matrix[int(level), :, 1], "wavenumbers", to_AU=False),
-                 label=f"{level}$nu_OH$")
-        print(np.column_stack((g_matrix[int(level), :, 0], Constants.convert(g_matrix[int(level), :, 1],
-                                                                             "wavenumbers", to_AU=False))))
-    plt.xlabel("Torsion")
-    plt.ylabel("G-Matrix (cm^-1)")
+        if level <= 6:
+            plt.plot(g_matrix[int(level), :, 0], Constants.convert(g_matrix[int(level), :, 1], "wavenumbers", to_AU=False),
+                     color=colors[int(level)], label="v$_{OH}$ = % s" % int(level), linewidth=2.5)
+            print(np.column_stack((g_matrix[int(level), :, 0], Constants.convert(g_matrix[int(level), :, 1],
+                                                                                 "wavenumbers", to_AU=False))))
+    plt.xlabel(r"$\tau$ [Degrees]")
+    plt.xticks(np.arange(0, 390, 60))
+    plt.ylabel("G-Matrix [cm$^{-1}$]")
+    plt.legend()
     plt.show()
     return g_matrix
 

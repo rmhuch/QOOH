@@ -11,9 +11,6 @@ class TransitionMoments:
         self.transition = transition
         self.MatSize = MatSize
         self._InterpedGDW = None
-        # self._TDM = None
-        # self._Mcoeffs = None
-        # self._DipoleMomentMatrix = None
 
     @property
     def InterpedGDW(self):
@@ -21,26 +18,6 @@ class TransitionMoments:
             self._InterpedGDW = self.interpDW()
             # returns a "tuple" of grid, wfns, dips
         return self._InterpedGDW
-
-    # @property
-    # def Mcoeffs(self):
-    #     if self._Mcoeffs is None:
-    #         # Dipole Moment Coefficients
-    #         self._Mcoeffs = self.calc_Mcoeffs()
-    #     return self._Mcoeffs
-
-    # @property
-    # def TDM(self):
-    #     if self._TDM is None:
-    #         self._TDM = self.calc_TDM()
-    #         # returns the TDM (x, y, z) of the given transition
-    #     return self._TDM
-
-    # @property
-    # def DipoleMomentMatrix(self):
-    #     if self._DipoleMomentMatrix is None:
-    #         self._DipoleMomentMatrix = self.calc_DipoleMomentMatrix()
-    #     return self._DipoleMomentMatrix
 
     def interpDW(self):
         """Interpolate dipole moment and wavefunction to be the same length and range"""
@@ -99,15 +76,42 @@ class TransitionMoments:
                 mus[k, j] = normMu
         return mus  # in all au, returns only the TDM of the given transition (transition_str)
 
-    def plot_TDM(self):
+    def plot_TDM(self, filename=None):
         import matplotlib.pyplot as plt
+        params = {'text.usetex': False,
+                  'mathtext.fontset': 'dejavusans',
+                  'font.size': 14}
+        plt.rcParams.update(params)
         for Tstring in self.transition:
+            fig = plt.figure(figsize=(7, 8), dpi=350)
             TDM = self.calc_TDM(Tstring)
             degrees = np.linspace(0, 360, len(TDM))
+            plt.plot(degrees, np.repeat(0, len(degrees)), "-k", linewidth=3)
+            colors = ["C0", "C1", "C2"]
             for c, val in enumerate(["A", "B", "C"]):
-                plt.plot(degrees, TDM[:, c], 'o', label=f"{val} - Component")
+                plt.plot(degrees, TDM[:, c] / 0.393456, 'o', color=colors[c], label=f"{val} - Component")
+                plt.plot(degrees, TDM[:, c] / 0.393456, '-', color=colors[c], linewidth=3)
+            if Tstring[-1] is "1":
+                plt.ylim(-0.07, 0.07)
+            elif Tstring[-1] is "2":
+                plt.ylim(-0.020, 0.020)
+            elif Tstring[-1] is "3":
+                plt.ylim(-0.004, 0.004)
+            elif Tstring[-1] is "4":
+                plt.ylim(-0.001, 0.001)
+            elif Tstring[-1] is "5":
+                plt.ylim(-0.0005, 0.0005)
+            plt.ylabel(r"$\mu$ [Debye]")
+            plt.xlim(-10, 370)
+            plt.xlabel(r"$\tau$ [Degrees]")
+            plt.xticks(np.arange(0, 390, 60))
+            plt.title(f"{Tstring}")
             plt.legend()
-            plt.show()
+            if filename is None:
+                plt.show()
+            else:
+                fig.savefig(f"{filename}_{Tstring[0]}{Tstring[-1]}.png", dpi=fig.dpi, bbox_inches="tight")
+                print(f"Figure saved to {filename}_{Tstring[0]}{Tstring[-1]}")
 
     def calc_Mcoeffs(self, TDM):
         from FourierExpansions import calc_sin_coefs, calc_cos_coefs
@@ -163,43 +167,54 @@ class TransitionMoments:
     # calculate overlap of torsion wfns with TDM
     def calc_intensity(self, numGstates=4, numEstates=4):
         from collections import OrderedDict
+        import csv
         all_intensities = OrderedDict()
         for Tstring in self.transition:  # should be a list of strings
             Glevel = int(Tstring[0])
             Exlevel = int(Tstring[-1])
-            gstorWfn_coefs = self.PORresults[0][Glevel]["eigvecs"]
-            gstorEnergies = self.PORresults[0][Glevel]["energy"]
-            extorWfn_coefs = self.PORresults[0][Exlevel]["eigvecs"]
-            extorEnergies = self.PORresults[0][Exlevel]["energy"]
-            intensities = []
-            TDM = self.calc_TDM(Tstring)
-            M_coeffs = self.calc_Mcoeffs(TDM)
-            DipMomMat = self.calc_DipoleMomentMatrix(M_coeffs)
-            for gState in np.arange(numGstates):
-                for exState in np.arange(numEstates):
-                    freq = extorEnergies[exState] - gstorEnergies[gState]
-                    freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
-                    print("\n")
-                    print(f"OH - {Tstring}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
-                    comp_intents = np.zeros(3)
-                    for c, val in enumerate(["A", "B", "C"]):  # loop through components
-                        supere = np.dot(DipMomMat[c, :, :], extorWfn_coefs[:, exState].T)
-                        matEl = np.dot(gstorWfn_coefs[:, gState], supere)
-                        comp_intents[c] = (abs(matEl) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)
-                        print(f"{val} : {comp_intents[c]:.8f} km/mol")
-                    intensity = np.sum(comp_intents)
-                    print(f"total : {intensity:.6f}")
-                    pop = 0.6950356  # Boltzman in cm^-1 / K from nist.gov
-                    BW = np.exp(-1*(Constants.convert(gstorEnergies[gState]-gstorEnergies[0],
-                                                      "wavenumbers", to_AU=False))/(pop*300))
-                    BW_intensity = BW * intensity
-                    if comp_intents[1] > 1E-10:
-                        ratio = comp_intents[1] / comp_intents[2]
-                        print(f"B/C ratio : {ratio:.4f}")
-                    intensities.append([gState, exState, freq_wave, intensity, BW, BW_intensity])
-                    # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol), BW, boltzman weighted intensity]
-            all_intensities[Tstring] = intensities
-        return all_intensities  # ordered dict keyed by transition, holding a list of all the tor transitions
+            with open(f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}.csv", mode="w") as results:
+                results_writer = csv.writer(results, delimiter=',')
+                results_writer.writerow(["initial", "final", "frequency(cm^-1)", "mu_a(Debye)", "mu_b", "mu_c",
+                                         "A (km/mol)", "B", "C", "tot_intensity(km/mol)", "boltzman weight",
+                                         "BW intensity"])
+                gstorWfn_coefs = self.PORresults[0][Glevel]["eigvecs"]
+                gstorEnergies = self.PORresults[0][Glevel]["energy"]
+                extorWfn_coefs = self.PORresults[0][Exlevel]["eigvecs"]
+                extorEnergies = self.PORresults[0][Exlevel]["energy"]
+                intensities = []
+                TDM = self.calc_TDM(Tstring)
+                M_coeffs = self.calc_Mcoeffs(TDM)
+                DipMomMat = self.calc_DipoleMomentMatrix(M_coeffs)
+                for gState in np.arange(numGstates):
+                    for exState in np.arange(numEstates):
+                        freq = extorEnergies[exState] - gstorEnergies[gState]
+                        freq_wave = Constants.convert(freq, "wavenumbers", to_AU=False)
+                        # print("\n")
+                        # print(f"OH - {Tstring}, tor - {gState} -> {exState} : {freq_wave:.2f} cm^-1")
+                        matEl = np.zeros(3)
+                        matEl_D = np.zeros(3)
+                        comp_intents = np.zeros(3)
+                        for c, val in enumerate(["A", "B", "C"]):  # loop through components
+                            supere = np.dot(DipMomMat[c, :, :], extorWfn_coefs[:, exState].T)
+                            matEl[c] = np.dot(gstorWfn_coefs[:, gState], supere)
+                            matEl_D[c] = matEl[c] / 0.393456
+                            comp_intents[c] = (abs(matEl[c]) ** 2) * freq_wave * 2.506 / (0.393456 ** 2)
+                            # print(f"{val} : {comp_intents[c]:.8f} km/mol")
+                        # print(matEl)
+                        intensity = np.sum(comp_intents)
+                        # print(f"total : {intensity:.6f}")
+                        pop = 0.6950356  # Boltzman in cm^-1 / K from nist.gov
+                        BW = np.exp(-1*(Constants.convert(gstorEnergies[gState]-gstorEnergies[0],
+                                                          "wavenumbers", to_AU=False))/(pop*300))
+                        BW_intensity = BW * intensity
+                        if comp_intents[1] > 1E-10:
+                            ratio = comp_intents[1] / comp_intents[2]
+                            # print(f"B/C ratio : {ratio:.4f}")
+                        intensities.append([gState, exState, freq_wave, intensity, BW, BW_intensity])
+                        results_writer.writerow([gState, exState, freq_wave, *matEl_D, *comp_intents, intensity, BW,
+                                                 BW_intensity])
+                all_intensities[Tstring] = intensities
+        # return all_intensities  # ordered dict keyed by transition, holding a list of all the tor transitions
 
     def calc_stat_intensity(self, values=None):
         from FourierExpansions import calc_curves
