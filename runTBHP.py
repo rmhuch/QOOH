@@ -5,6 +5,7 @@ import numpy as np
 from FourierExpansions import calc_curves
 from Converter import Constants
 from TransitionMoments import TransitionMoments
+from PlotOHAdiabats import *
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
           'font.size': 14}
@@ -20,7 +21,7 @@ tbhp = MoleculeInfo(MoleculeName="TBHP",
                                                          "160", "170", "180", "190", "200", "210", "220", "230",
                                                          "240", "250", "260", "270", "280", "290", "300", "310",
                                                          "320", "330", "340", "350", "360"]],
-                    dipole_npz="rotated_dipoles_tbhp.npz")
+                    dipole_npz="rotated_dipoles_coords_tbhp.npz")
 
 tbhp_res_obj = MoleculeResults(MoleculeInfo_obj=tbhp,
                                DVRparams={"desired_energies": 8,
@@ -28,41 +29,25 @@ tbhp_res_obj = MoleculeResults(MoleculeInfo_obj=tbhp,
                                           "plot_phased_wfns": False,
                                           "extrapolate": 0.3},
                                PORparams={"HamSize": 15,
-                                          "PrintResults": True,
-                                          "Vexpansion": "sixth"},  # add "barrier_height" : ... to scale(one at a time)
-                               Intenseparams={"numGstates": 4,
-                                              "numEstates": 6},
+                                          "PrintResults": False,
+                                          "Vexpansion": "sixth",
+                                          "twoD": True},  # add "barrier_height" : ... to scale(one at a time)
+                               Intenseparams={"numGstates": 8,
+                                              "numEstates": 8,
+                                              "FranckCondon": True},
                                transition=[f"0->{i}" for i in [1, 2, 3, 4, 5]])
 
 def run_pot_plots():
     res, wfns = tbhp_res_obj.PORresults
-    from PlotOHAdiabats import make_Potplots, make_Wfnplots, make_allWfnplots
-    # rad_x = np.linspace(0, 2*np.pi, 100)
-    # x = np.linspace(0, 360, 100)
-    # ePot = tbhp_res_obj.RxnPathResults["electronicE"]
-    # ePot[:, 1] = Constants.convert(ePot[:, 1]-min(ePot[:, 1]), "wavenumbers", to_AU=False)
-    # plt.plot(ePot[:, 0], ePot[:, 1], "-r", linewidth=2.5)
-    # # elPot = Constants.convert(calc_curves(rad_x, tbhp_res_obj.VelCoeffs), "wavenumbers", to_AU=False)
-    # # plt.plot(x, elPot, '-b', linewidth=2.5)
-    # gsPot = Constants.convert(calc_curves(rad_x, res[0]["V"]), "wavenumbers", to_AU=False)
-    # plt.plot(x, gsPot, '-k', linewidth=2.5)
-    # gsPot1 = Constants.convert(calc_curves(rad_x, res[1]["V"]), "wavenumbers", to_AU=False)
-    # plt.plot(x, gsPot1, '-k', linewidth=2.5)
-    # esPot = Constants.convert(calc_curves(rad_x, res[2]["V"]), "wavenumbers", to_AU=False)
-    # plt.plot(x, esPot, '-k', linewidth=2.5)
-    # plt.xticks(np.arange(0, 390, 60))
-    # plt.ylabel(r"Energy (cm$^{-1}$)")
-    # plt.xlabel(r"$\tau$")
-    # plt.show()
+    from PlotOHAdiabats import make_Potplots, make_Wfnplots
     make_Potplots(res[0], res[2], ZPE=True, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_wZPE"))
-    # make_Potplots(res[0], res[2], ZPE=False, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_woZPE"))
+    make_Potplots(res[0], res[2], ZPE=False, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_woZPE"))
     # gsResDict, esResDict, wfnns, gs_idx=0, es_idx=1, filename=None
-    # make_Wfnplots(res[0], res[2], wfns, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_1overtonewfns"))
-    # make_Wfnplots(res[0], res[2], wfns, upper_idx=(2, 3),
-    #               filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_combowfns"))
-    # make_Wfnplots(res[0], res[2], wfns, lower_idx=(2, 3), upper_idx=(4, 5),
-    #               filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_hotcombowfns"))
-    # make_allWfnplots(res[0], res[2], wfns, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_allbuthotwfns"))
+    make_Wfnplots(res[0], res[2], wfns, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_1overtonewfns"))
+    make_Wfnplots(res[0], res[2], wfns, upper_idx=(2, 3),
+                  filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_combowfns"))
+    make_Wfnplots(res[0], res[2], wfns, lower_idx=(2, 3), upper_idx=(4, 5),
+                  filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH02_hotcombowfns"))
 
 def tor_freq_plot_bh(barrier_heights, expvals, PORresults, true_bh, oh_levels=None):
     if oh_levels is None:  # OLD need to patch if going to use
@@ -170,19 +155,6 @@ def make_tor_freq_plot(exp_vals, bhs=None, sfs=None):
             IntenseDict[i] = obj.TransitionIntensities
         tor_freq_plot_sf(sfs, exp_vals, IntenseDict)
 
-def calc_stationary_intensities():
-    for i in ["1", "2", "3", "4", "5"]:
-        obj = MoleculeResults(MoleculeInfo_obj=tbhp,
-                               DVRparams={"desired_energies": 8,
-                                          "num_pts": 2000,
-                                          "plot_phased_wfns": False,
-                                          "extrapolate": 0.3},
-                               PORparams={"HamSize": 15},
-                               Intenseparams={"numGstates": 4,
-                                              "numEstates": 4},
-                               transition=f"0->{i}")
-        a = obj.StatTransitionIntensities
-
 def run_emil_data(plot=False):
     emil_res = MoleculeResults(MoleculeInfo_obj=tbhp,
                                DVRparams={"desired_energies": 8,
@@ -192,10 +164,12 @@ def run_emil_data(plot=False):
                                PORparams={"HamSize": 15,
                                           "EmilData": True,
                                           "Vexpansion": "fourth",
-                                          "PrintResults": True},
+                                          "PrintResults": True,
+                                          "twoD": False},
                                Intenseparams={"numGstates": 4,
-                                              "numEstates": 6},
-                               transition=[f"0->{i}" for i in [2, 3, 4, 5]])
+                                              "numEstates": 6,
+                                              "FranckCondon": True},
+                               transition=[f"0->{i}" for i in [1, 2, 3, 4, 5]])
     if plot:
         res, wfns = emil_res.PORresults
         from PlotOHAdiabats import make_Potplots, make_Wfnplots
@@ -291,22 +265,21 @@ def make_Vel_plots(mol_res_obj):
     plt.plot(np.arange(0, 360, 1), Constants.convert(velZPE, "wavenumbers", to_AU=False))
     plt.show()
 
-def make_Intensity_plots(mol_res_obj):
-    from PlotOHAdiabats import make_PotWfnplots, make_one_Potplot, make_Potplots
+def make_plots(mol_res_obj):
+    from Gmatrix import make_gmat_plot
     TMobj = TransitionMoments(mol_res_obj.DegreeDVRresults, mol_res_obj.PORresults, mol_res_obj.MoleculeInfo,
                                           transition=[f"0->{i}" for i in np.arange(1, 6)], MatSize=mol_res_obj.PORparams["HamSize"])
-    # TMobj.plot_TDM(filename=os.path.join(tbhp.MoleculeDir, "figures", "TDM"))
-    res, wfns = mol_res_obj.PORresults
-    # make_one_Potplot(res[0], ZPE=False, filename=os.path.join(tbhp.MoleculeDir, "figures", "vOH0_levels"))
-    # make_Potplots(res[0], res[2], ZPE=True)
-    # make_PotWfnplots(res[0], wfns[0], ZPE=False, wfn_idx=[(0, 1), (2, 3), (4, 5)],
-    #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH0_allwfns"))
-    # for i in np.arange(1, 6):
-    #     make_PotWfnplots(res[i], wfns[i], wfn_idx=[(0, 1), (2, 3), (4, 5)],
-    #                      filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH{i}_allwfns"))
-    # make_one_Wfn_plot(res[2], wfns[2], idx=(2, 3))
-    # make_PA_plots(wfns)
-    
+    TMobj.plot_TDM(filename=os.path.join(tbhp.MoleculeDir, "figures", "TDM"))
+    # res, wfns = mol_res_obj.PORresults
+    # make_pot_comp_plot(res[:6], filename="potential_comp_RP_DFT")
+    # make_Potplots(res[0], res[2], ZPE=True, filename="vOH02_potlevels")
+    # make_Wfnplots(res[0], res[2], wfnns=wfns, lower_idx=(0, 1), upper_idx=(0, 1),
+    #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH02_fundwfns"))
+    # make_Wfnplots(res[0], res[2], wfnns=wfns, lower_idx=(0, 1), upper_idx=(2, 3),
+    #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH02_combowfns"))
+    # make_gmat_plot(mol_res_obj.Gmatrix["gmatrix"])
+
+
 if __name__ == '__main__':
     from RotConstants import calc_all_RotConstants
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -315,15 +288,11 @@ if __name__ == '__main__':
     sf = [None, 0.9, 0.8, 0.7, 0.6, 0.5]
     TBHPexp = [186, 198, 217, 262]
     # make_CCSD_tor_freq_plot_sf(TBHPexp, sfs=sf)
-    # e = run_mixed_data(type=2, plot=True)
+    # e = run_emil_data()
     # a = e.TransitionIntensities
-    # run_pot_plots()
-    # make_Vel_plots(tbhp_res_obj)
-    # run_pot_plots()
-    make_Intensity_plots(tbhp_res_obj)
-    # a = tbhp_res_obj.TransitionIntensities
-    # for i in np.arange(1, 6):
-    #     calc_all_RotConstants(tbhp_fdir, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
-    #                           numstates=6,
-    #                           vOH=f"{i}")
-    a = tbhp_res_obj.Gmatrix
+    a = tbhp_res_obj.TransitionIntensities
+    # b = tbhp_res_obj.Gmatrix
+    # for i in np.arange(0, 6):
+    #     calc_all_RotConstants(tbhp, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
+    #                           numstates=6, vOH=f"{i}", filetags="_RP")
+    # make_plots(tbhp_res_obj)

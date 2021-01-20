@@ -37,7 +37,7 @@ def calc_sin_coefs(energy_dat):
     return popt
 
 def calc_curves(x, coefs, function="cos"):
-    """calculates and plots the expansion based off passed x (angle values IN RADIANS) and coefficients"""
+    """calculates the expansion function based off passed x (angle values IN RADIANS) and coefficients"""
     if function == "cos":
         energies = cos_func(x, *coefs)
     elif function == "4cos":
@@ -48,3 +48,12 @@ def calc_curves(x, coefs, function="cos"):
         raise Exception(f"Can not use {function} as an expansion function.")
     return energies
 
+def calc_derivs(x, coefs, function="cos"):
+    """calculates the derivative of a sin or cos expansion given x (IN RADIANS) and expansion coefficients"""
+    if function == "cos":
+        derivs = np.dot(-coefs, [n*np.sin(n*x) for n in range(len(coefs))])
+    elif function == "sin":
+        derivs = np.dot(coefs, [n*np.cos(n*x) for n in range(len(coefs))])
+    else:
+        raise Exception(f"Can not calculate derivatives of a {function} function.")
+    return derivs

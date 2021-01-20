@@ -70,15 +70,24 @@ class MoleculeInfo:
     def get_DegreeDict(self):
         degreedict = dict()
         vals = np.load(os.path.join(self.MoleculeDir, self.oh_scan_npz), allow_pickle=True)
-        sort_degrees = np.arange(0, 370, 10)
+        sort_degrees = np.arange(10, 370, 10)
         for i in sort_degrees:
             E = vals[f"{i}.0"][0]
             rOH = vals[f"{i}.0"][1]["B6"]
             degreedict[i] = np.column_stack((rOH, E))
-        eqE = vals[str(self.eqTORangle)][0]
-        eqE -= min(eqE)  # subtract of min E of JUST EQ scan here
-        eqrOH = vals[str(self.eqTORangle)][1]["B6"]
-        eqvals = np.column_stack((eqrOH, eqE))
+        if type(self.eqTORangle) == list:
+            eqvals = []
+            for i in self.eqTORangle:
+                eqE = vals[str(i)][0]
+                eqE -= min(eqE)  # subtract of min E of JUST EQ scan here
+                eqrOH = vals[str(i)][1]["B6"]
+                eqvvals = np.column_stack((eqrOH, eqE))
+                eqvals.append(eqvvals)
+        else:
+            eqE = vals[str(self.eqTORangle)][0]
+            eqE -= min(eqE)  # subtract of min E of JUST EQ scan here
+            eqrOH = vals[str(self.eqTORangle)][1]["B6"]
+            eqvals = np.column_stack((eqrOH, eqE))
         # print(degreedict[180])
         # data in degrees: angstroms/hartrees
         return degreedict, eqvals
@@ -139,14 +148,14 @@ class MoleculeResults:
     @property
     def Gmatrix(self):
         if self._Gmatrix is None:
-            # resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
-            #                            f"{self.MoleculeInfo.MoleculeName}_Gmatrix_elements.npz")
-            # if os.path.exists(resultspath):
-            #     self._Gmatrix = np.load(resultspath)
-            # else:
-            #     print(f"{resultspath} not found. Beginning Gmatrix calculation")
-            results = self.run_gmatrix()
-            self._Gmatrix = np.load(results)
+            resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                       f"{self.MoleculeInfo.MoleculeName}_Gmatrix_elements.npz")
+            if os.path.exists(resultspath):
+                self._Gmatrix = np.load(resultspath)
+            else:
+                print(f"{resultspath} not found. Beginning Gmatrix calculation")
+                results = self.run_gmatrix()
+                self._Gmatrix = np.load(results)
         return self._Gmatrix
 
     @property
@@ -169,7 +178,10 @@ class MoleculeResults:
                     results = self.calculate_VelwZPE()
                     self._VelCoeffs = np.load(results)
             else:
-                if self.PORparams["Vexpansion"] is "sixth":
+                if self.PORparams["twoD"]:
+                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy")
+                elif self.PORparams["Vexpansion"] is "sixth":
                     resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
                                                f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.npy")
                 elif self.PORparams["Vexpansion"] is "fourth":
@@ -220,6 +232,10 @@ class MoleculeResults:
         print(f"DVR Results saved to {npz_name} in {self.MoleculeInfo.MoleculeDir}")
         return os.path.join(self.MoleculeInfo.MoleculeDir, npz_name)
 
+    def plot_degreeDVR(self):
+        from DVRtools import ohWfn_plots
+        ohWfn_plots(self.DegreeDVRresults, wfns2plt=6, degree=None)
+
     def run_gmatrix(self):
         from ExpectationValues import run_DVR
         from Gmatrix import get_tor_gmatrix, get_eq_g
@@ -266,7 +282,10 @@ class MoleculeResults:
             nonzero_freqs_har = Constants.convert(nonzero_freqs, "wavenumbers", to_AU=True)
             ZPE = np.sum(nonzero_freqs_har)/2
             if j in new_degree:
-                Vel_ZPE_dict[j] = Vel[i] + ZPE
+                if self.PORparams["twoD"]:
+                    Vel_ZPE_dict[j] = Vel[i]
+                else:
+                    Vel_ZPE_dict[j] = Vel[i] + ZPE
                 ZPE_dict[j] = ZPE
             else:
                 pass
@@ -301,6 +320,9 @@ class MoleculeResults:
             if "MixedData2" in self.PORparams or self.PORparams["Vexpansion"] is "fourth":
                 VelwZPE_coeffs = calc_4cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.npy"
+            elif self.PORparams["twoD"]:
+                VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy"
             else:
                 VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.npy"
@@ -427,8 +449,21 @@ class MoleculeResults:
         from TransitionMoments import TransitionMoments
         trans_mom_obj = TransitionMoments(self.DegreeDVRresults, self.PORresults, self.MoleculeInfo,
                                           transition=self.transition, MatSize=self.PORparams["HamSize"])
-        intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
-                                                   numEstates=self.Intenseparams["numEstates"])
+        if "EmilData" in self.PORparams:
+            print("calculating intensities using CCSD")
+            intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
+                                                       numEstates=self.Intenseparams["numEstates"],
+                                                       FC=self.Intenseparams["FranckCondon"],
+                                                       twoD=self.PORparams["twoD"], ccsd=True)
+        else:
+            intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
+                                                       numEstates=self.Intenseparams["numEstates"],
+                                                       FC=self.Intenseparams["FranckCondon"],
+                                                       twoD=self.PORparams["twoD"])
+            # trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
+            #                                            numEstates=self.Intenseparams["numEstates"],
+            #                                            FC=self.Intenseparams["FranckCondon"],
+            #                                            twoD=self.PORparams["twoD"])
         # ordered dict keyed by transition, holding a list (see below) for all the tor transitions
         # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol), BW, Boltzmann-Weighted Intensity (km/mol)]
         return intensities

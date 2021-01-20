@@ -3,28 +3,41 @@ from Converter import Constants
 import numpy as np
 import os
 
-def RotConstants(fchkDir, fchkName):
-    data = DataClass(os.path.join(fchkDir, fchkName))
-    coordies = COMcoords(data)  # mass weighted and COM shifted in bohr
+def RotConstants(MolecularInfo_obj, filename):
+    data = MolecularInfo_obj.DipoleMomentSurface[filename]
+    coords = data[:, 4:]
+    # DipoleMomentSurface contains rotated coordinates, so we start after the surface.
+    # These values are eckart rotated and center of mass shifted and mass weighted and in bohr
+    # coordies = Constants.convert(coords, "angstroms", to_AU=False)
+    coordies = coords.reshape((coords.shape[0], 16, 3))[12]
     I0_mat = sum(np.eye(3)*np.linalg.norm(ri)**2 - np.outer(ri, ri) for ri in coordies)
     I_inverse = np.linalg.inv(I0_mat)
     rot_consts2 = np.diag(I_inverse)
     rot_consts = rot_consts2/2
     return rot_consts
 
+def RotConstants_prev(fchkDir, fchkName):
+    data = DataClass(os.path.join(fchkDir, fchkName))
+    coordies = COMcoords(data)  # mass weighted and COM shifted in bohr
+    I0_mat = sum(np.eye(3) * np.linalg.norm(ri) ** 2 - np.outer(ri, ri) for ri in coordies)
+    I_inverse = np.linalg.inv(I0_mat)
+    rot_consts2 = np.diag(I_inverse)
+    rot_consts = rot_consts2/2
+    return rot_consts
+
 def RotCoeffs(RotationConstants):
-    from FourierExpansions import calc_sin_coefs, calc_cos_coefs, calc_curves
+    from FourierExpansions import calc_cos_coefs, calc_curves
     import matplotlib.pyplot as plt
     Mcoefs = np.zeros((7, 3))  # [num_coeffs, (ABC)]
     x = np.radians(np.linspace(0, 360, len(RotationConstants)))
     for c, val in enumerate(["A", "B", "C"]):
-        # fit to 6th order sin functions
+        # fit to 6th order cos functions
         data = np.column_stack((x, RotationConstants[:, c]*6579689.7))
         Mcoefs[:, c] = calc_cos_coefs(data)
         y = calc_curves(np.radians(np.arange(0, 361, 1)), Mcoefs[:, c]/6579689.7, function="cos")
-    #     plt.plot(np.arange(0, 361, 1), y)
-    #     plt.plot(np.degrees(x), RotationConstants[:, c], "o")
-    # plt.show()
+        plt.plot(np.arange(0, 361, 1), y)
+        plt.plot(np.degrees(x), RotationConstants[:, c], "o")
+    plt.show()
     return Mcoefs
 
 def RotationMatrix(RotationCoeffs, MatSize=15):
@@ -49,19 +62,19 @@ def RotationMatrix(RotationCoeffs, MatSize=15):
     return fullMat
 
 
-def calc_all_RotConstants(fchkDir, torWfn_coefs, numstates, vOH):
+def calc_all_RotConstants(molInfo_obj, torWfn_coefs, numstates, vOH, filetags=""):
     import csv
     from Converter import Constants
     degrees = np.arange(0, 370, 10)
     rots = np.zeros((len(degrees), 3))
-    with open(f"RotationalConstants_vOH{vOH}.csv", mode="w") as results:
+    with open(f"RotationalConstants_vOH{vOH}{filetags}.csv", mode="w") as results:
         results_writer = csv.writer(results, delimiter=',')
         results_writer.writerow(["initial", "final", "A", "B", "C"])
         for d, val in enumerate(["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110",
                                  "120", "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230",
                                  "240", "250", "260", "270", "280", "290", "300", "310", "320", "330", "340", "350",
                                  "360"]):
-            rots[d] = RotConstants(fchkDir, f"tbhp_{val}.fchk")
+            rots[d] = RotConstants(molInfo_obj, f"tbhp_{val}.log")
         R_coeffs = RotCoeffs(rots)
         R_mat = RotationMatrix(R_coeffs)
         for State in np.arange(numstates):
@@ -74,13 +87,8 @@ def calc_all_RotConstants(fchkDir, torWfn_coefs, numstates, vOH):
 
 
 if __name__ == '__main__':
-    udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    tbhp_fdir = os.path.join(udrive, "TBHP", "TorFchks")
-    tbhp_fchkNames = [f"tbhp_{i}.fchk" for i in ["000", "010", "020", "030", "040", "050", "060", "070",
-                                                         "080", "090", "100", "110", "120", "130", "140", "150",
-                                                         "160", "170", "180", "190", "200", "210", "220", "230",
-                                                         "240", "250", "260", "270", "280", "290", "300", "310",
-                                                         "320", "330", "340", "350", "360"]]
-    for name in tbhp_fchkNames:
-        RotConstants(tbhp_fdir, name)
+    from MolecularResults import *
+    from runTBHP import tbhp
+    for name in tbhp.TorFiles:
+        RotConstants(tbhp, name)
 

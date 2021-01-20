@@ -4,25 +4,37 @@ from Converter import Constants
 
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
-          'font.size': 14}
+          'font.size': 10}
 plt.rcParams.update(params)
 
 def make_Wfnplots(gsResDict, esResDict, wfnns, lower_idx=(0, 1), upper_idx=(0, 1), filename=None):
     """To do this we will make a broken axis plot.. good to keep in back pocket.."""
     # 'break' the y-axis into two portions - use the top (ax2) for the upper level (gsResDict)
     # and the bottom (ax) for the lower level (gsResDict)
-    f, (ax2, ax) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
+    f, (ax2, ax) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=600)
     # complete analysis and gather data
     x = np.linspace(0, 360, 100)
     en0g = Constants.convert(gsResDict['energy'][lower_idx[0]], "wavenumbers", to_AU=False)
-    wfn0g = en0g + wfnns[0][:, lower_idx[0]]*10  # *10 for aestheics only (on all wfn)
+    wfn0g = wfnns[0][:, lower_idx[0]]
+    if wfn0g[21] < wfn0g[0]:
+        wfn0g *= -1
+    wfn0g = en0g + wfn0g * 10  # *10 for aestheics only (on all wfn)
     en1g = Constants.convert(gsResDict['energy'][lower_idx[1]], "wavenumbers", to_AU=False)
-    wfn1g = en1g + wfnns[0][:, lower_idx[1]]*10
+    wfn1g = wfnns[0][:, lower_idx[1]]
+    if wfn1g[21] < wfn1g[0]:
+        wfn1g *= -1
+    wfn1g = en1g + wfn1g * 10  # *10 for aestheics only (on all wfn)
 
     en0e = Constants.convert(esResDict['energy'][upper_idx[0]], "wavenumbers", to_AU=False)
-    wfn0e = en0e + wfnns[2][:, upper_idx[0]]*-10
+    wfn0e = wfnns[0][:, upper_idx[0]]
+    if wfn0e[21] < wfn0e[0]:
+        wfn0e *= -1
+    wfn0e = en0e + wfn0e * 10  # *10 for aestheics only (on all wfn)
     en1e = Constants.convert(esResDict['energy'][upper_idx[1]], "wavenumbers", to_AU=False)
-    wfn1e = en1e + wfnns[2][:, upper_idx[1]]*-10
+    wfn1e = wfnns[0][:, upper_idx[1]]
+    if wfn1e[21] < wfn1e[0]:
+        wfn1e *= -1
+    wfn1e = en1e + wfn1e * 10  # *10 for aestheics only (on all wfn)
     # plot
     colors = ["b", "r", "g", "indigo", "teal", "mediumvioletred"]
     ax.plot(x, np.repeat(en0g, len(x)), "-k", linewidth=3)
@@ -58,7 +70,7 @@ def make_Wfnplots(gsResDict, esResDict, wfnns, lower_idx=(0, 1), upper_idx=(0, 1
     if filename is None:
         plt.show()
     else:
-        f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
+        f.savefig(f"{filename}.jpg", dpi=f.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
 
 def make_one_Wfn_plot(ResDict, wfnn, idx=(0, 1)):
@@ -99,7 +111,7 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     """ Plot the potential curves and energy levels of the given transitions. If ZPE plots include the ZPE,
     else they are plotted with the ZPE subtracted off so that min(gsPot) = 0 """
     from FourierExpansions import calc_curves
-    f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=350)
+    f, (ax, ax2) = plt.subplots(2, 1, sharex="all", figsize=(7, 8), dpi=600)
     x = np.linspace(0, 360, 100)
     rad_x = np.linspace(0, 2*np.pi, 100)
     # create gs plot
@@ -152,12 +164,12 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     if filename is None:
         plt.show()
     else:
-        f.savefig(f"{filename}.png", dpi=f.dpi, bbox_inches="tight")
+        f.savefig(f"{filename}.jpg", dpi=f.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
 
 def make_one_Potplot(porRes, ZPE=False, filename=None):
     from FourierExpansions import calc_curves
-    fig = plt.figure(figsize=(7, 8), dpi=350)
+    fig = plt.figure(figsize=(7, 8), dpi=600)
     x = np.linspace(0, 360, 100)
     rad_x = np.linspace(0, 2*np.pi, 100)
     if len(porRes["V"]) < 7:
@@ -184,14 +196,38 @@ def make_one_Potplot(porRes, ZPE=False, filename=None):
     if filename is None:
         plt.show()
     else:
-        fig.savefig(f"{filename}.png", dpi=fig.dpi, bbox_inches="tight")
+        fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
+
+def make_pot_comp_plot(fullporRes, filename=None):
+    from FourierExpansions import calc_curves
+    fig = plt.figure(figsize=(4, 4), dpi=600)
+    x = np.linspace(0, 360, 100)
+    rad_x = np.linspace(0, 2 * np.pi, 100)
+    colors = ["b", "r", "goldenrod", "indigo", "mediumseagreen", "darkturquoise"]
+    for i, porRes in enumerate(fullporRes):
+        if len(porRes["V"]) < 7:
+            porRes["V"] = np.hstack((porRes["V"], np.zeros(7 - len(porRes["V"]))))
+        Pot = Constants.convert(calc_curves(rad_x, porRes["V"]), "wavenumbers", to_AU=False)
+        Pot -= min(Pot)
+        plt.plot(x, Pot, color=colors[i], label="v$_{OH}$ = % s" % i)
+    plt.ylabel(r"V($\tau$) (cm$^{-1}$)")
+    plt.xlabel(r"$\tau$ (Degrees)")
+    plt.xticks(np.arange(0, 450, 90))
+    plt.xlim(0, 360)
+    plt.legend()
+    if filename is None:
+        plt.show()
+    else:
+        fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
+        print(f"Figure saved to {filename}")
+
 
 def make_PotWfnplots(porRes, wfnns, wfn_idx=[(0, 1)], ZPE=True, filename=None):
     """ Plot the potential curves and energy levels of the given transitions. If ZPE plots include the ZPE,
     else they are plotted with the ZPE subtracted off so that min(gsPot) = 0 """
     from FourierExpansions import calc_curves
-    fig = plt.figure(figsize=(7, 8), dpi=350)
+    fig = plt.figure(figsize=(7, 8), dpi=600)
     x = np.linspace(0, 360, 100)
     rad_x = np.linspace(0, 2 * np.pi, 100)
     # create gs plot
@@ -231,7 +267,7 @@ def make_PotWfnplots(porRes, wfnns, wfn_idx=[(0, 1)], ZPE=True, filename=None):
     if filename is None:
         plt.show()
     else:
-        fig.savefig(f"{filename}.png", dpi=fig.dpi, bbox_inches="tight")
+        fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
 
 def make_scaledPots(mol_res_obj):
