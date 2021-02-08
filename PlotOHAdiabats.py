@@ -107,7 +107,7 @@ def make_PA_plots(wfnns):
         plt.xticks(np.arange(0, 390, 30))
         plt.show()
 
-def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
+def make_Potplots(gsRes, esRes, numStates=4, ZPE=True, filename=None):
     """ Plot the potential curves and energy levels of the given transitions. If ZPE plots include the ZPE,
     else they are plotted with the ZPE subtracted off so that min(gsPot) = 0 """
     from FourierExpansions import calc_curves
@@ -122,7 +122,7 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     esPot = Constants.convert(calc_curves(rad_x, esRes["V"]), "wavenumbers", to_AU=False)
     enX = np.linspace(180 / 3, 2 * 180 - 180 / 3, 10)
     colors = ["b", "r", "g", "indigo", "teal", "mediumvioletred"]
-    for i in np.arange(4):
+    for i in np.arange(numStates):
         en = Constants.convert(gsRes['energy'][i], "wavenumbers", to_AU=False)
         ene = Constants.convert(esRes['energy'][i], "wavenumbers", to_AU=False)
         if ZPE is False:
@@ -159,8 +159,8 @@ def make_Potplots(gsRes, esRes, ZPE=True, filename=None):
     # add big axis for labels
     f.add_subplot(111, frameon=False)
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.ylabel(r"Energy [cm$^{-1}$]", labelpad=15.0)
-    plt.xlabel(r"$\tau [Degrees]$")
+    plt.ylabel(r"Energy (cm$^{-1}$)", labelpad=15.0)
+    plt.xlabel(r"$\tau (Degrees)$")
     if filename is None:
         plt.show()
     else:
@@ -210,8 +210,9 @@ def make_pot_comp_plot(fullporRes, filename=None):
             porRes["V"] = np.hstack((porRes["V"], np.zeros(7 - len(porRes["V"]))))
         Pot = Constants.convert(calc_curves(rad_x, porRes["V"]), "wavenumbers", to_AU=False)
         Pot -= min(Pot)
-        plt.plot(x, Pot, color=colors[i], label="v$_{OH}$ = % s" % i)
-    plt.ylabel(r"V($\tau$) (cm$^{-1}$)")
+        plt.plot(x, Pot, color=colors[i], label=r"v$_\mathrm{OH}$ = % s" % i)
+    plt.ylabel(r"$V_{\mathrm{v_{OH}}}^\mathrm{eff.}$($\tau$) - "
+               r"$V_{\mathrm{v_{OH}}}^\mathrm{eff.}$($\tau_\mathrm{min}$)(cm$^{-1}$)")
     plt.xlabel(r"$\tau$ (Degrees)")
     plt.xticks(np.arange(0, 450, 90))
     plt.xlim(0, 360)
@@ -261,9 +262,9 @@ def make_PotWfnplots(porRes, wfnns, wfn_idx=[(0, 1)], ZPE=True, filename=None):
     plt.plot(x, gsPot, "-k", linewidth=3)
 
     plt.xticks(np.arange(0, 390, 60))
-    plt.xlabel(r"$\tau$ [Degrees]")
+    plt.xlabel(r"$\tau$ (Degrees)")
     plt.ylim(min(gsPot)-20, min(gsPot)+1020)
-    plt.ylabel(r"Energy [cm$^{-1}$]", labelpad=15.0)
+    plt.ylabel(r"Energy (cm$^{-1}$)", labelpad=15.0)
     if filename is None:
         plt.show()
     else:

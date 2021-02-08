@@ -39,6 +39,7 @@ def COMcoords(data, massweight=True):
         fcoords = mwCOM_coords
     else:
         fcoords = COM_coords
+    print(fcoords)
     return fcoords
 
 def NormModeFreqs(fchk_names):

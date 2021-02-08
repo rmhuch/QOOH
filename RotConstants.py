@@ -27,7 +27,6 @@ def RotConstants_prev(fchkDir, fchkName):
 
 def RotCoeffs(RotationConstants):
     from FourierExpansions import calc_cos_coefs, calc_curves
-    import matplotlib.pyplot as plt
     Mcoefs = np.zeros((7, 3))  # [num_coeffs, (ABC)]
     x = np.radians(np.linspace(0, 360, len(RotationConstants)))
     for c, val in enumerate(["A", "B", "C"]):
@@ -35,9 +34,6 @@ def RotCoeffs(RotationConstants):
         data = np.column_stack((x, RotationConstants[:, c]*6579689.7))
         Mcoefs[:, c] = calc_cos_coefs(data)
         y = calc_curves(np.radians(np.arange(0, 361, 1)), Mcoefs[:, c]/6579689.7, function="cos")
-        plt.plot(np.arange(0, 361, 1), y)
-        plt.plot(np.degrees(x), RotationConstants[:, c], "o")
-    plt.show()
     return Mcoefs
 
 def RotationMatrix(RotationCoeffs, MatSize=15):
@@ -85,10 +81,25 @@ def calc_all_RotConstants(molInfo_obj, torWfn_coefs, numstates, vOH, filetags=""
                 matEl[c] = Constants.convert(matEl_au, "wavenumbers", to_AU=False)
             results_writer.writerow([State, State, *matEl])
 
+def pull_coords(MolecularInfo_obj):
+    import csv
+    with open(f"RP_geometeries_B2PLYP.csv", mode="w") as results:
+        results_writer = csv.writer(results, delimiter=',')
+        for d, val in enumerate(["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110",
+                                 "120", "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230",
+                                 "240", "250", "260", "270", "280", "290", "300", "310", "320", "330", "340", "350",
+                                 "360"]):
+            results_writer.writerow([val])
+            filename = f"tbhp_{val}.log"
+            data = MolecularInfo_obj.DipoleMomentSurface[filename]
+            coords = data[:, 4:]
+            coordies = coords.reshape((coords.shape[0], 16, 3))[12]
+            results_writer.writerows(coordies)
 
 if __name__ == '__main__':
     from MolecularResults import *
     from runTBHP import tbhp
-    for name in tbhp.TorFiles:
-        RotConstants(tbhp, name)
+    pull_coords(tbhp)
+    # for name in tbhp.TorFiles:
+    #     RotConstants(tbhp, name)
 

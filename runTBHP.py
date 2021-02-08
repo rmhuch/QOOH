@@ -34,7 +34,7 @@ tbhp_res_obj = MoleculeResults(MoleculeInfo_obj=tbhp,
                                           "twoD": True},  # add "barrier_height" : ... to scale(one at a time)
                                Intenseparams={"numGstates": 8,
                                               "numEstates": 8,
-                                              "FranckCondon": True},
+                                              "FranckCondon": False},
                                transition=[f"0->{i}" for i in [1, 2, 3, 4, 5]])
 
 def run_pot_plots():
@@ -268,13 +268,16 @@ def make_Vel_plots(mol_res_obj):
 def make_plots(mol_res_obj):
     from Gmatrix import make_gmat_plot
     TMobj = TransitionMoments(mol_res_obj.DegreeDVRresults, mol_res_obj.PORresults, mol_res_obj.MoleculeInfo,
-                                          transition=[f"0->{i}" for i in np.arange(1, 6)], MatSize=mol_res_obj.PORparams["HamSize"])
+                              transition=[f"0->{i}" for i in np.arange(1, 6)], MatSize=mol_res_obj.PORparams["HamSize"])
     TMobj.plot_TDM(filename=os.path.join(tbhp.MoleculeDir, "figures", "TDM"))
     # res, wfns = mol_res_obj.PORresults
     # make_pot_comp_plot(res[:6], filename="potential_comp_RP_DFT")
     # make_Potplots(res[0], res[2], ZPE=True, filename="vOH02_potlevels")
-    # make_Wfnplots(res[0], res[2], wfnns=wfns, lower_idx=(0, 1), upper_idx=(0, 1),
-    #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH02_fundwfns"))
+    # for i in np.arange(1, 6):
+        # make_PotWfnplots(res[i], wfns[i], wfn_idx=[(0, 1), (2, 3), (4, 5)],
+        #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH{i}_allwfns"))
+    # make_PotWfnplots(res[0], wfns[0], wfn_idx=[(0, 1), (2, 3)],
+    #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH0_4wfns"))
     # make_Wfnplots(res[0], res[2], wfnns=wfns, lower_idx=(0, 1), upper_idx=(2, 3),
     #                  filename=os.path.join(tbhp.MoleculeDir, "figures", f"vOH02_combowfns"))
     # make_gmat_plot(mol_res_obj.Gmatrix["gmatrix"])
@@ -290,9 +293,10 @@ if __name__ == '__main__':
     # make_CCSD_tor_freq_plot_sf(TBHPexp, sfs=sf)
     # e = run_emil_data()
     # a = e.TransitionIntensities
-    a = tbhp_res_obj.TransitionIntensities
+    # a = tbhp_res_obj.TransitionIntensities
     # b = tbhp_res_obj.Gmatrix
-    # for i in np.arange(0, 6):
-    #     calc_all_RotConstants(tbhp, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
-    #                           numstates=6, vOH=f"{i}", filetags="_RP")
+    for i in np.arange(0, 6):
+        calc_all_RotConstants(tbhp, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
+                              numstates=8, vOH=f"{i}", filetags="_RP")
     # make_plots(tbhp_res_obj)
+    # a = tbhp_res_obj.PORresults.Vcoeffs

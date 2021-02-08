@@ -5,8 +5,10 @@ from runTBHP import tbhp, tbhp_res_obj
 
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
-          'font.size': 10}
+          'font.size': 11}
 plt.rcParams.update(params)
+plt.rc('axes', labelsize=15)
+plt.rc('axes', labelsize=15)
 
 def make_ohPA_plots(wfnns):
     x = wfnns[:, 0]
@@ -32,7 +34,7 @@ def make_ohPanel(wfnns, datfile):
     leg2 = plt.legend(handles=h, loc='upper right')
     plt.xlim(0.7, 1.7)
     plt.ylim(-100, 150)
-    plt.ylabel(r"$\Delta$ ZPE (cm$^{-1}$)")
+    plt.ylabel(r"$\Delta$ ZPVE (cm$^{-1}$)")
     plt.xlabel(r"OH bond length ($\AA$)")
     plt.savefig("Figure_OHvsE.jpg", dpi=fig.dpi, bbox_inches="tight")
 
@@ -59,7 +61,9 @@ def make_torPanel(wfnns, datfile):
     plt.xticks(np.arange(0, 390, 30))
     plt.xlim(60, 300)
     plt.ylim(-100, 150)
-    plt.ylabel(r"$\Delta$ ZPE (cm$^{-1}$)")
+    plt.rc('axes', labelsize=15)
+    plt.rc('axes', labelsize=15)
+    plt.ylabel(r"$\Delta$ ZPVE (cm$^{-1}$)")
     plt.xlabel(r"$\tau$ (Degrees)")
     plt.savefig("Figure_TorvsE.jpg", dpi=fig.dpi, bbox_inches="tight")
 
@@ -67,6 +71,6 @@ def make_torPanel(wfnns, datfile):
 if __name__ == '__main__':
     wfns = np.loadtxt("EqTOR_wfns_forMark.dat")
     make_ohPanel(wfns, "Fig3_data_oh.csv")
-    res, torWfns = tbhp_res_obj.PORresults
-    make_torPanel(torWfns, "Fig3_data_tor.csv")
+    # res, torWfns = tbhp_res_obj.PORresults
+    # make_torPanel(torWfns, "Fig3_data_tor.csv")
     # plt.show()

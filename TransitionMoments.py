@@ -79,7 +79,9 @@ class TransitionMoments:
         import matplotlib.pyplot as plt
         params = {'text.usetex': False,
                   'mathtext.fontset': 'dejavusans',
-                  'font.size': 10}
+                  'font.size': 15}
+        plt.rc('axes', labelsize=20)
+        plt.rc('axes', labelsize=20)
         plt.rcParams.update(params)
         for Tstring in self.transition:
             fig = plt.figure(figsize=(7, 8), dpi=600)
@@ -90,26 +92,31 @@ class TransitionMoments:
             for c, val in enumerate(["A", "B", "C"]):
                 plt.plot(degrees, TDM[:, c] / 0.393456, 'o', color=colors[c], label=f"{val} - Component")
                 plt.plot(degrees, TDM[:, c] / 0.393456, '-', color=colors[c], linewidth=3)
+            plt.plot(np.repeat(113, 10), np.linspace(-0.1, 0.1, 10), '--', color="gray", label=r"$\tau_{eq}$")
+            plt.plot(np.repeat(247, 10), np.linspace(-0.1, 0.1, 10), '--', color="gray")
             if Tstring[-1] is "1":
                 plt.ylim(-0.07, 0.07)
+                plt.legend(loc="lower left")
             elif Tstring[-1] is "2":
                 plt.ylim(-0.020, 0.020)
+                plt.legend(loc="upper left")
             elif Tstring[-1] is "3":
                 plt.ylim(-0.004, 0.004)
+                plt.legend(loc="upper left")
             elif Tstring[-1] is "4":
                 plt.ylim(-0.001, 0.001)
+                plt.legend(loc="lower left")
             elif Tstring[-1] is "5":
-                plt.ylim(-0.0005, 0.0005)
-            plt.ylabel(r"$\mu$ [Debye]")
+                plt.ylim(-0.0003, 0.0003)
+                plt.legend(loc="lower left")
+            plt.ylabel(r"$M_{0 \rightarrow % s}$ (Debye)" % Tstring[-1])
             plt.xlim(-10, 370)
-            plt.xlabel(r"$\tau$ [Degrees]")
+            plt.xlabel(r"$\tau$ (Degrees)")
             plt.xticks(np.arange(0, 390, 60))
-            plt.title(f"{Tstring}")
-            plt.legend()
             if filename is None:
                 plt.show()
             else:
-                fig.savefig(f"{filename}_{Tstring[0]}{Tstring[-1]}.png", dpi=fig.dpi, bbox_inches="tight")
+                fig.savefig(f"{filename}_{Tstring[0]}{Tstring[-1]}_eq.jpg", dpi=fig.dpi, bbox_inches="tight")
                 print(f"Figure saved to {filename}_{Tstring[0]}{Tstring[-1]}")
 
     def calc_Mcoeffs(self, TDM):

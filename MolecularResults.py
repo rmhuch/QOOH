@@ -228,7 +228,6 @@ class MoleculeResults:
         npz_name = f"{self.MoleculeInfo.MoleculeName}_vOH_DVRresults_{params['num_pts']}.npz"
         np.savez(os.path.join(self.MoleculeInfo.MoleculeDir, npz_name), potential=potential_array,
                  frequencies=freqs, energies=epsilon_pots, wavefunctions=wavefuns_array)
-        # print(epsilon_pots)
         print(f"DVR Results saved to {npz_name} in {self.MoleculeInfo.MoleculeDir}")
         return os.path.join(self.MoleculeInfo.MoleculeDir, npz_name)
 
@@ -267,7 +266,6 @@ class MoleculeResults:
     def calculate_VelwZPE(self):
         from Converter import Constants
         from FourierExpansions import calc_cos_coefs, calc_4cos_coefs, calc_curves
-        import matplotlib.pyplot as plt
         degree_vals = np.linspace(0, 360, len(self.MoleculeInfo.TorFiles))
         norm_grad = self.RxnPathResults["norm_grad"]
         idx = np.where(norm_grad[:, 1] > 4E-4)
@@ -307,6 +305,7 @@ class MoleculeResults:
             y -= min(y)  # shift curve so minima are at 0 instead of negative
             VelwZPE_coeffs = calc_4cos_coefs(np.column_stack((new_x, y)))
             npy_name = f"{self.MoleculeInfo.MoleculeName}_Emil_Velcoeffs_4order.npy"
+            csv_name = f"{self.MoleculeInfo.MoleculeName}_Emil_Velcoeffs_4order.csv"
         else:
             print("DFT Vel")
             Vel_ZPE = np.array([(d, v) for d, v in Vel_ZPE_dict.items()])
@@ -320,14 +319,18 @@ class MoleculeResults:
             if "MixedData2" in self.PORparams or self.PORparams["Vexpansion"] is "fourth":
                 VelwZPE_coeffs = calc_4cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.npy"
+                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.csv"
             elif self.PORparams["twoD"]:
                 VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy"
+                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.csv"
             else:
                 VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.npy"
+                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.csv"
         # save results
         np.save(os.path.join(self.MoleculeInfo.MoleculeDir, npy_name), VelwZPE_coeffs)
+        np.savetxt(os.path.join(self.MoleculeInfo.MoleculeDir, csv_name), VelwZPE_coeffs)
         return os.path.join(self.MoleculeInfo.MoleculeDir, npy_name)
 
     def make_diff_freq_plots(self):
