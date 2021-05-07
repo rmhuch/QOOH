@@ -39,7 +39,7 @@ def COMcoords(data, massweight=True):
         fcoords = mwCOM_coords
     else:
         fcoords = COM_coords
-    print(fcoords)
+    # print(fcoords)
     return fcoords
 
 def NormModeFreqs(fchk_names):
@@ -52,7 +52,7 @@ def NormModeFreqs(fchk_names):
     resAU = run(hess, numCoords, mass)
     freqsAU = np.sqrt(resAU["freq2"])
     freqs = Constants.convert(freqsAU, "wavenumbers", to_AU=False)
-    print(freqs)
+    # print(freqs)
     return freqs
 
 def mwFMatrix(data):

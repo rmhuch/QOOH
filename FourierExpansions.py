@@ -36,6 +36,53 @@ def calc_sin_coefs(energy_dat):
     popt, pcov = optimize.curve_fit(sin_func, energy_dat[:, 0], energy_dat[:, 1])
     return popt
 
+def fourier_func(x, cos_coeffs, sin_coeffs):
+    """
+    Evals a Fourier series
+    """
+    cos_evals = sum(c * np.cos(i * x) for i, c in enumerate(cos_coeffs))
+    # we assume sin_coeffs has explicitly dropped the 0 term
+    sin_evals = sum(c * np.sin((i + 1) * x) for i, c in enumerate(sin_coeffs))
+    return cos_evals + sin_evals
+
+def fourier_fitter(x, *coeffs, cos_order=6):
+    """
+    Evaluates a Fourier series so scipy can fit it.
+    Assume coeffs starts with the cos part and then follows with the
+    sin part
+    """
+    cos_coeffs = coeffs[:cos_order+1]
+    sin_coeffs = coeffs[cos_order+1:]
+    return fourier_func(x, cos_coeffs, sin_coeffs)
+
+def fourier_coeffs(energy_dat, cos_order=6, sin_order=6):
+    """
+    ....
+    """
+    initial_guess = np.random.rand(cos_order + sin_order)
+    # array of length n coeffs (sin + cos) for scipy to work from
+    popt, pcov = optimize.curve_fit(fourier_fitter, energy_dat[:, 0], energy_dat[:, 1], p0=initial_guess)
+    cos_coeffs = popt[:cos_order+1]
+    sin_coeffs = popt[cos_order+1:]
+    return cos_coeffs, sin_coeffs
+
+def fourier_barrier(coefs):
+    """
+    uses scipy minimize/maximize to calculate the barrier of a given potential and its proper minima.
+    """
+    res = np.zeros((3, 2))
+    min1Res = optimize.minimize(fourier_func, x0=np.radians(110), args=(coefs[0], coefs[1]))
+    res[0, 0] = min1Res["x"][0]
+    res[0, 1] = fourier_func(res[0, 0], coefs[0], coefs[1])
+    min2Res = optimize.minimize(fourier_func, x0=np.radians(270), args=(coefs[0], coefs[1]))
+    res[1, 0] = min2Res["x"][0]
+    res[1, 1] = fourier_func(res[1, 0], coefs[0], coefs[1])
+    centerx = np.linspace(res[0, 0], res[1, 0], 10000)
+    center = calc_curves(centerx, coefs, function="fourier")
+    res[2, 0] = centerx[np.argmax(center)]
+    res[2, 1] = center[np.argmax(center)]
+    return res
+
 def calc_curves(x, coefs, function="cos"):
     """calculates the expansion function based off passed x (angle values IN RADIANS) and coefficients"""
     if function == "cos":
@@ -44,6 +91,8 @@ def calc_curves(x, coefs, function="cos"):
         energies = cos4_func(x, *coefs)
     elif function == "sin":
         energies = sin_func(x, *coefs)
+    elif function == "fourier":
+        energies = fourier_func(x, coefs[0], coefs[1])
     else:
         raise Exception(f"Can not use {function} as an expansion function.")
     return energies

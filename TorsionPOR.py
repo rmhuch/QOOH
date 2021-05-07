@@ -1,9 +1,9 @@
 import numpy as np
 
 class POR:
-    def __init__(self, DVR_res, g_matrix, Velcoeffs, params):
+    def __init__(self, DVR_res, fit_gmatrix, Velcoeffs, params):
         self.DVRresults = DVR_res
-        self.Gmatrix = g_matrix
+        self.FitGmatrix = fit_gmatrix
         self.Velcoeffs = Velcoeffs
         self.PORparams = params
         if "HamSize" in params:
@@ -54,8 +54,8 @@ class POR:
     def calc_Bcoeffs(self):
         from FourierExpansions import calc_cos_coefs
         coeff_dict = dict()  # build coeff dict
-        for i in np.arange(self.Gmatrix.shape[0]):
-            gmatrix_coeffs = calc_cos_coefs(self.Gmatrix[i]) / 2
+        for i in self.FitGmatrix.keys():
+            gmatrix_coeffs = self.FitGmatrix[i] / 2
             coeff_dict[f"B{i}"] = gmatrix_coeffs
         return coeff_dict
 

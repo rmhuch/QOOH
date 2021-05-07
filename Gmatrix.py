@@ -78,7 +78,7 @@ def get_eq_g(tor_angles, internal_coords, masses):
         TBHP/QOOH: 1-H, 2-O, 3-O, 4-C"""
     # this calculates the gmatrix element for the torsion as a function of the roh expectation value
     # masses is in atomic units!
-    internal_dict = get_bonds_angles(tor_angles, internal_coords)
+    internal_dict = get_bonds_angles(internal_coords.keys(), internal_coords)
     g_matrix = np.zeros((len(tor_angles), 2))  # [[num tor points, gmatrix element]]
     for i, angle in enumerate(tor_angles):
         g_matrix[i, 0] = angle

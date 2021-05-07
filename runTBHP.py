@@ -29,9 +29,22 @@ tbhp_res_obj = MoleculeResults(MoleculeInfo_obj=tbhp,
                                           "plot_phased_wfns": False,
                                           "extrapolate": 0.3},
                                PORparams={"HamSize": 15,
-                                          "PrintResults": False,
+                                          "PrintResults": True,
                                           "Vexpansion": "sixth",
                                           "twoD": True},  # add "barrier_height" : ... to scale(one at a time)
+                               Intenseparams={"numGstates": 8,
+                                              "numEstates": 8,
+                                              "FranckCondon": True},
+                               transition=[f"0->{i}" for i in [1, 2, 3, 4, 5]])
+
+tbhp_dvr_obj = MoleculeResults(MoleculeInfo_obj=tbhp,
+                               DVRparams={"desired_energies": 8,
+                                          "num_pts": 2000,
+                                          "plot_phased_wfns": False,
+                                          "extrapolate": 0.3,
+                                          "PrintResults": False},
+                               PORparams={"None": True,
+                                          "Vexpansion": "sixth"},
                                Intenseparams={"numGstates": 8,
                                               "numEstates": 8,
                                               "FranckCondon": False},
@@ -290,13 +303,14 @@ if __name__ == '__main__':
     bhs = [None, 225, 250, 275, 300, 325]
     sf = [None, 0.9, 0.8, 0.7, 0.6, 0.5]
     TBHPexp = [186, 198, 217, 262]
-    # make_CCSD_tor_freq_plot_sf(TBHPexp, sfs=sf)
-    # e = run_emil_data()
-    # a = e.TransitionIntensities
     # a = tbhp_res_obj.TransitionIntensities
+    e = run_emil_data()
+    a = e.TransitionIntensities
     # b = tbhp_res_obj.Gmatrix
-    for i in np.arange(0, 6):
-        calc_all_RotConstants(tbhp, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
-                              numstates=8, vOH=f"{i}", filetags="_RP")
+    # for i in np.arange(0, 6):
+    #     calc_all_RotConstants(tbhp, torWfn_coefs=tbhp_res_obj.PORresults[0][i]["eigvecs"],
+    #                           numstates=8, vOH=f"{i}", filetags="_RP")
     # make_plots(tbhp_res_obj)
     # a = tbhp_res_obj.PORresults.Vcoeffs
+    # a = tbhp_dvr_obj.torDVRresults
+    # b = tbhp_res_obj.PORresults

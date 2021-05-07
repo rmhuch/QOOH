@@ -1,6 +1,7 @@
 import numpy as np
 import os
 
+
 class MoleculeInfo:
     def __init__(self, MoleculeName, atom_array, eqTORangle, oh_scan_npz=None, TorFchkDirectory=None,
                  TorFiles=None, ModeFchkDirectory=None, ModeFiles=None, dipole_npz=None):
@@ -70,11 +71,16 @@ class MoleculeInfo:
     def get_DegreeDict(self):
         degreedict = dict()
         vals = np.load(os.path.join(self.MoleculeDir, self.oh_scan_npz), allow_pickle=True)
-        sort_degrees = np.arange(10, 370, 10)
+        sort_degrees = np.arange(0, 370, 10)
         for i in sort_degrees:
-            E = vals[f"{i}.0"][0]
-            rOH = vals[f"{i}.0"][1]["B6"]
-            degreedict[i] = np.column_stack((rOH, E))
+            if i == 0:
+                E = vals[f"360.0"][0]
+                rOH = vals[f"360.0"][1]["B6"]
+            else:
+                E = vals[f"{i}.0"][0]
+                rOH = vals[f"{i}.0"][1]["B6"]
+            idx = np.argsort(rOH)
+            degreedict[i] = np.column_stack((rOH[idx], E[idx]))
         if type(self.eqTORangle) == list:
             eqvals = []
             for i in self.eqTORangle:
@@ -97,18 +103,26 @@ class MoleculeInfo:
         vals = np.load(os.path.join(self.MoleculeDir, self.oh_scan_npz), allow_pickle=True)
         sort_degrees = np.arange(0, 370, 10)
         for i in sort_degrees:
-            full_dict = vals[f"{i}.0"][1]
+            if i == 0:
+                full_dict = vals["360.0"][1]
+                full_dict["D4"] = np.repeat(0.0, 52)
+            else:
+                full_dict = vals[f"{i}.0"][1]
             for j in full_dict.keys():  # go through and if the value is just repeated only return one value.
                 if full_dict[j][0] == full_dict[j][1] and full_dict[j][0] == full_dict[j][2]:
                     full_dict[j] = full_dict[j][0]
             internaldict[i] = full_dict
-        eq_dict = vals[str(self.eqTORangle)][1]
+        if type(self.eqTORangle) == list:
+            eq_dict = vals[str(self.eqTORangle[0])][1]
+        else:
+            eq_dict = vals[str(self.eqTORangle)][1]
         for j in eq_dict.keys():  # go through and if the value is just repeated only return one value.
             if eq_dict[j][0] == eq_dict[j][1] and eq_dict[j][0] == eq_dict[j][2]:
                 eq_dict[j] = eq_dict[j][0]
         eqICD = eq_dict
         # data in degrees: angstroms/degrees
         return internaldict, eqICD
+
 
 class MoleculeResults:
     def __init__(self, MoleculeInfo_obj, DVRparams, PORparams, Intenseparams, transition="0->2"):
@@ -126,8 +140,10 @@ class MoleculeResults:
         self._TORmodes = None
         self._PotentialCoeffs = None
         self._Gmatrix = None
+        self._fittedGmatrix = None
         self._RxnPathResults = None
         self._VelCoeffs = None
+        self._torDVRresults = None
         self._PORresults = None
         self._TransitionIntensities = None
         self._StatTransitionIntensities = None
@@ -159,6 +175,12 @@ class MoleculeResults:
         return self._Gmatrix
 
     @property
+    def fittedGmatrix(self):
+        if self._fittedGmatrix is None:
+            self._fittedGmatrix = self.fit_gmat()
+        return self._fittedGmatrix
+
+    @property
     def RxnPathResults(self):
         if self._RxnPathResults is None:
             self._RxnPathResults = self.run_reaction_path()
@@ -178,7 +200,13 @@ class MoleculeResults:
                     results = self.calculate_VelwZPE()
                     self._VelCoeffs = np.load(results)
             else:
-                if self.PORparams["twoD"]:
+                if self.PORparams["None"] and self.PORparams["twoD"] is False:
+                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.npy")
+                elif self.PORparams["None"] and self.PORparams["twoD"]:
+                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.npy")
+                elif self.PORparams["twoD"]:
                     resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
                                                f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy")
                 elif self.PORparams["Vexpansion"] is "sixth":
@@ -191,12 +219,18 @@ class MoleculeResults:
                     raise Exception(f"Can not expand Vel in {self.PORparams['Vexpansion']}")
                 if os.path.exists(resultspath):
                     print(f"Using {resultspath} to calculate Vel + ZPE coeffs")
-                    self._VelCoeffs = np.load(resultspath)
+                    self._VelCoeffs = np.load(resultspath, allow_pickle=True)
                 else:
                     print(f"{resultspath} not found. beginning Vel + ZPE calculation")
                     results = self.calculate_VelwZPE()
                     self._VelCoeffs = np.load(results)
         return self._VelCoeffs
+
+    @property
+    def torDVRresults(self):
+        if self._torDVRresults is None:
+            self._torDVRresults = self.run_tor_DVR()
+        return self._torDVRresults
 
     @property
     def PORresults(self):
@@ -237,21 +271,41 @@ class MoleculeResults:
 
     def run_gmatrix(self):
         from ExpectationValues import run_DVR
-        from Gmatrix import get_tor_gmatrix, get_eq_g
+        from Gmatrix import get_tor_gmatrix, get_eq_g, make_gmat_plot
         Epot_array = self.MoleculeInfo.eqPES
+        if type(Epot_array) == list:
+            Epot_array = Epot_array[0]  # use the first eq point
+        else:
+            pass
         params = self.DVRparams
         ens, rOH_wfns = run_DVR(Epot_array, NumPts=params["num_pts"], desiredEnergies=params["desired_energies"],
                                 extrapolate=params["extrapolate"])
         tor_angles = self.MoleculeInfo.PES_DegreeDict.keys()
         mass_array = self.MoleculeInfo.mass_array
-        tor_masses = np.array((mass_array[6], mass_array[4], mass_array[5], np.inf)) 
+        tor_masses = np.array((mass_array[6], mass_array[4], mass_array[5], np.inf))
         res = get_tor_gmatrix(rOH_wfns, tor_angles, self.MoleculeInfo.InternalCoordDict, tor_masses)
-        eq_g = get_eq_g(tor_angles, self.MoleculeInfo.InternalCoordDict, tor_masses)
-        # for i in np.arange(len(res)):
-        #     np.savetxt(f"B2PLYP_Gmatrix_elements_voh{i}.txt", res[i])
+        # eq_g = get_eq_g(tor_angles, self.MoleculeInfo.eqICD, tor_masses)
+        # SOMETHING in eq_g is messed up... but we don't use it.. so.. maybe fix later? or remove completely
+        for i in np.arange(len(res)):
+            file_name = f"B2PLYP_Gmatrix_elements_voh{i}.txt"
+            np.savetxt(os.path.join(self.MoleculeInfo.MoleculeDir, file_name), res[i])
+        make_gmat_plot(res)
         npz_name = f"{self.MoleculeInfo.MoleculeName}_Gmatrix_elements.npz"
-        np.savez(os.path.join(self.MoleculeInfo.MoleculeDir, npz_name), gmatrix=res, eq_gmatrix=eq_g)
+        np.savez(os.path.join(self.MoleculeInfo.MoleculeDir, npz_name), gmatrix=res)  # , eq_gmatrix=eq_g)
         return os.path.join(self.MoleculeInfo.MoleculeDir, npz_name)
+
+    def fit_gmat(self):
+        from FourierExpansions import fourier_coeffs, calc_cos_coefs
+        fittedG = dict()
+        for i in np.arange(len(self.Gmatrix["gmatrix"])):
+            if "None" in self.PORparams:
+                coeffs = fourier_coeffs(np.column_stack((np.radians(self.Gmatrix["gmatrix"][i][:, 0]),
+                                                         self.Gmatrix["gmatrix"][i][:, 1])), cos_order=6, sin_order=6)
+            else:
+                coeffs = calc_cos_coefs(np.column_stack((np.radians(self.Gmatrix["gmatrix"][i][:, 0]),
+                                                         self.Gmatrix["gmatrix"][i][:, 1])))
+            fittedG[i] = coeffs
+        return fittedG
 
     def run_reaction_path(self):
         from ReactionPath import run_energies, run_Emil_energies
@@ -263,9 +317,28 @@ class MoleculeResults:
             rxn_path_res["EmilelectronicE"] = EmilelectronicE
         return rxn_path_res
 
+    def plot_fourier(self):
+        from Converter import Constants
+        from FourierExpansions import fourier_coeffs, calc_curves, calc_cos_coefs
+        import matplotlib.pyplot as plt
+        interp_degree = np.linspace(0, 360, 100)
+        interp_rad = np.radians(np.linspace(0, 360, 100))
+        EE = np.copy(self.RxnPathResults["electronicE"])
+        EE[:, 0] = np.radians(EE[:, 0])
+        cos_coeffs, sin_coeffs = fourier_coeffs(EE, cos_order=6, sin_order=6)
+        coeff2 = calc_cos_coefs(EE)
+        print("cos", cos_coeffs)
+        print("sin", sin_coeffs)
+        interpE = calc_curves(interp_rad, [cos_coeffs, sin_coeffs], function="fourier")
+        interp2 = calc_curves(interp_rad, coeff2, function="cos")
+        plt.plot(self.RxnPathResults["electronicE"][:, 0], self.RxnPathResults["electronicE"][:, 1], "o")
+        plt.plot(interp_degree, interpE)
+        plt.plot(interp_degree, interp2)
+        plt.show()
+
     def calculate_VelwZPE(self):
         from Converter import Constants
-        from FourierExpansions import calc_cos_coefs, calc_4cos_coefs, calc_curves
+        from FourierExpansions import calc_cos_coefs, calc_4cos_coefs, fourier_coeffs, calc_curves
         degree_vals = np.linspace(0, 360, len(self.MoleculeInfo.TorFiles))
         norm_grad = self.RxnPathResults["norm_grad"]
         idx = np.where(norm_grad[:, 1] > 4E-4)
@@ -275,12 +348,12 @@ class MoleculeResults:
         ZPE_dict = dict()
         for i, j in enumerate(degree_vals):
             freqs = self.RxnPathResults[j]["freqs"]  # in hartree
-            print(np.column_stack((j, freqs[-1])))
+            # print(np.column_stack((j, freqs[-1])))
             nonzero_freqs = freqs[7:-1]  # throw out translations/rotations and OH frequency
             nonzero_freqs_har = Constants.convert(nonzero_freqs, "wavenumbers", to_AU=True)
-            ZPE = np.sum(nonzero_freqs_har)/2
+            ZPE = np.sum(nonzero_freqs_har) / 2
             if j in new_degree:
-                if self.PORparams["twoD"]:
+                if self.PORparams["twoD"]:  # "twoD" in self.PORparams and
                     Vel_ZPE_dict[j] = Vel[i]
                 else:
                     Vel_ZPE_dict[j] = Vel[i] + ZPE
@@ -295,7 +368,7 @@ class MoleculeResults:
             ZPE = ZPE[sort_idxZ]
             ZPE[:, 0] = np.radians(ZPE[:, 0])
             fit_ZPE = calc_4cos_coefs(ZPE)
-            zpe_y = calc_curves(np.radians(np.arange(0, 360, 1)), fit_ZPE, function="4cos")
+            # zpe_y = calc_curves(np.radians(np.arange(0, 360, 1)), fit_ZPE, function="4cos")
             emil_angles = self.RxnPathResults["EmilelectronicE"][:, 0]
             emil_ZPE = calc_curves(np.radians(emil_angles), fit_ZPE, function="4cos")
             Vel_ZPE = np.column_stack((np.radians(emil_angles), emil_ZPE+self.RxnPathResults["EmilelectronicE"][:, 1]))
@@ -312,19 +385,39 @@ class MoleculeResults:
             sort_idx = np.argsort(Vel_ZPE[:, 0])
             Vel_ZPE = Vel_ZPE[sort_idx]
             Vel_ZPE[:, 0] = np.radians(Vel_ZPE[:, 0])
-            VelwZPE_coeffs1 = calc_cos_coefs(Vel_ZPE)
             new_x = np.radians(np.arange(0, 360, 1))
-            y = calc_curves(new_x, VelwZPE_coeffs1)
-            y -= min(y)  # shift curve so minima are at 0 instead of negative
             if "MixedData2" in self.PORparams or self.PORparams["Vexpansion"] is "fourth":
+                VelwZPE_coeffs1 = calc_4cos_coefs(Vel_ZPE)
+                y = calc_curves(new_x, VelwZPE_coeffs1, function="4cos")
+                y -= min(y)  # shift curve so minima are at 0 instead of negative
                 VelwZPE_coeffs = calc_4cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.npy"
                 csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.csv"
+            elif self.PORparams["None"] and self.PORparams["twoD"]:
+                VelwZPE_coeffs1 = fourier_coeffs(Vel_ZPE)
+                y = calc_curves(new_x, VelwZPE_coeffs1, function="fourier")
+                y -= min(y)  # shift curve so minima are at 0 instead of negative
+                VelwZPE_coeffs = fourier_coeffs(np.column_stack((new_x, y)))
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.npy"
+                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.csv"
+            elif self.PORparams["None"] and self.PORparams["twoD"] is False:
+                VelwZPE_coeffs1 = fourier_coeffs(Vel_ZPE)
+                y = calc_curves(new_x, VelwZPE_coeffs1, function="fourier")
+                y -= min(y)  # shift curve so minima are at 0 instead of negative
+                VelwZPE_coeffs = fourier_coeffs(np.column_stack((new_x, y)))
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.npy"
+                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.csv"
             elif self.PORparams["twoD"]:
+                VelwZPE_coeffs1 = calc_cos_coefs(Vel_ZPE)
+                y = calc_curves(new_x, VelwZPE_coeffs1)
+                y -= min(y)  # shift curve so minima are at 0 instead of negative
                 VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy"
                 csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.csv"
             else:
+                VelwZPE_coeffs1 = calc_cos_coefs(Vel_ZPE)
+                y = calc_curves(new_x, VelwZPE_coeffs1)
+                y -= min(y)  # shift curve so minima are at 0 instead of negative
                 VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.npy"
                 csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.csv"
@@ -358,7 +451,7 @@ class MoleculeResults:
             if deg > 180:
                 friend = 180 - (deg - 180)
             else:
-                friend = 180 + (180 - deg) 
+                friend = 180 + (180 - deg)
             pos = np.where(freq_data[:, 0] == friend)[0]
             if len(pos) == 0:
                 sym_dict[deg] = freq_data[idx, 1:]
@@ -376,7 +469,7 @@ class MoleculeResults:
         plt_sym_data = np.zeros((len(sym_data), 49))
         plt_sym_data[:, 0] = sym_data[:, 0]
         for i in np.arange(1, sym_data.shape[1]):
-            plt_sym_data[:, i] = (sym_data[:, i] - eq_freqs[i-1])/2
+            plt_sym_data[:, i] = (sym_data[:, i] - eq_freqs[i - 1]) / 2
         # fit OOH and OH to cos function expansions
         x_deg = np.arange(10, 351, 1)
         x_rad = np.radians(x_deg)
@@ -401,7 +494,7 @@ class MoleculeResults:
         mode_y = np.zeros(len(plt_sym_data))
         for j, d in enumerate(plt_sym_data[:, 0]):
             mode_sum = np.sum(sym_data[j, sel])
-            mode_y[j] = (mode_sum-eq_sum)/2
+            mode_y[j] = (mode_sum - eq_sum) / 2
         y_coeffs = calc_cos_coefs(np.column_stack([np.radians(plt_sym_data[:, 0]), mode_y]))
         y_vals = calc_curves(x_rad, y_coeffs)
         y_vals -= y_vals[eq_idx[0]]
@@ -431,7 +524,7 @@ class MoleculeResults:
         if "EmilData" in self.PORparams or "MixedData2" in self.PORparams:
             file_name = os.path.join(self.MoleculeInfo.MoleculeDir, "Emil_vOHenergies.txt")
             self.PORparams["EmilEnergies"] = np.loadtxt(file_name, skiprows=1)
-        PORobj = POR(DVR_res=self.DegreeDVRresults, g_matrix=self.Gmatrix["gmatrix"], Velcoeffs=self.VelCoeffs,
+        PORobj = POR(DVR_res=self.DegreeDVRresults, fit_gmatrix=self.fittedGmatrix, Velcoeffs=self.VelCoeffs,
                      params=self.PORparams)
         results = PORobj.solveHam()  # returns a list of dictionaries for each torsional potential
         if "PrintResults" in self.PORparams:
@@ -439,34 +532,92 @@ class MoleculeResults:
                 bh = Constants.convert(results[i]["barrier"], "wavenumbers", to_AU=False)
                 print(f"Barrier Height : {bh} cm^-1")
                 energy = results[i]["energy"]
-                print(f"vOH = {i} : E0+ : {Constants.convert(energy[0], 'wavenumbers', to_AU=False)}"
-                      f"            E0- : {Constants.convert(energy[1], 'wavenumbers', to_AU=False)} \n"
-                      f"            E1+ : {Constants.convert(energy[2], 'wavenumbers', to_AU=False)}"
-                      f"            E1- : {Constants.convert(energy[3], 'wavenumbers', to_AU=False)} \n"
-                      f"            E2+ : {Constants.convert(energy[4], 'wavenumbers', to_AU=False)}"
-                      f"            E2- : {Constants.convert(energy[5], 'wavenumbers', to_AU=False)}")
+                ens = Constants.convert(energy, "wavenumbers", to_AU=False)
+                print(f"vOH = {i} : E0+ : {ens[0]}  E0- : {ens[1]} / {ens[1]-ens[0]:.3f} \n"
+                      f"            E1+ : {ens[2]} / {ens[2]-ens[0]:.3f} E1- : {ens[3]} / {ens[3]-ens[0]:.3f} \n"
+                      f"            E2+ : {ens[4]} / {ens[4]-ens[0]:.3f} E2- : {ens[5]} / {ens[5]-ens[0]:.3f} \n"
+                      f"            E3+ : {ens[6]} / {ens[6]-ens[0]:.3f} E3- : {ens[7]} / {ens[7]-ens[0]:.3f} \n")
         wfns = PORobj.PORwfns()  # returns a list of arrays with each wfn for each torsional potential
         return results, wfns
 
+    def calc_Vcoeffs(self, func):
+        from Converter import Constants
+        from FourierExpansions import fourier_coeffs, calc_cos_coefs
+        print("Expanding potential coefficients in Full Fourier...")
+        dvr_energies = self.DegreeDVRresults["energies"]  # [degrees vOH=0 ... vOH=6]
+        dvr_energies[:, 1:] = Constants.convert(dvr_energies[:, 1:], "wavenumbers", to_AU=True)
+        coeff_dict = dict()  # build coeff dict
+        rad = np.radians(dvr_energies[:, 0])
+        coeff_dict["Vel"] = self.VelCoeffs
+        if func == "cos":
+            for i in np.arange(1, dvr_energies.shape[1]):  # loop through saved energies
+                energies = np.column_stack((rad, dvr_energies[:, i]))
+                coeff_dict[f"V{i - 1}"] = calc_cos_coefs(energies)
+        else:
+            for i in np.arange(1, dvr_energies.shape[1]):  # loop through saved energies
+                energies = np.column_stack((rad, dvr_energies[:, i]))
+                coeff_dict[f"V{i - 1}"] = fourier_coeffs(energies)
+        return coeff_dict
+
+    def run_tor_DVR(self):
+        from PiDVR import PiDVR
+        from Converter import Constants
+        all_res = []
+        pot_coeffs = self.calc_Vcoeffs(func="fourier")
+        for i in np.arange(len(pot_coeffs.keys()) - 1):
+            pot_coeffs1 = pot_coeffs["Vel"] + pot_coeffs[f"V{i}"]
+            DVRobj = PiDVR(PotentialCoeffs=pot_coeffs1,
+                           GmatCoeffs=self.fittedGmatrix[i], Nval=100)
+            all_res.append(DVRobj.Results)
+        if "PrintResults" in self.DVRparams:
+            for i in np.arange(len(all_res)):
+                mins = all_res[i]["minima"]
+                mins[:, 1] = Constants.convert(mins[:, 1], "wavenumbers", to_AU=False)
+                print(f"QOOH1 : {np.degrees(mins[0, 0])} / {mins[0, 1]} cm^-1")
+                print(f"QOOH2 : {np.degrees(mins[1, 0])} / {mins[1, 1]} cm^-1")
+                bh = Constants.convert(all_res[i]["barrier"], "wavenumbers", to_AU=False)
+                print(f"Barrier Height : {np.degrees(mins[2, 0])} / {bh} cm^-1")
+                energy = all_res[i]["energy"]
+                ens = Constants.convert(energy, "wavenumbers", to_AU=False)
+                Lps = all_res[i]["probs"][0]
+                Rps = all_res[i]["probs"][1]
+                print(f"vOH = {i} : E0 : {ens[0]} L:{Lps[0]} R: {Rps[0]} \n "
+                      f"            E1 : {ens[1]} / {ens[1]-ens[0]:.3f} L:{Lps[1]} R: {Rps[1]}\n"
+                      f"            E2 : {ens[2]} / {ens[2]-ens[0]:.3f} L:{Lps[2]} R: {Rps[2]}\n"
+                      f"            E3 : {ens[3]} / {ens[3]-ens[0]:.3f} L:{Lps[3]} R: {Rps[3]}\n"
+                      f"            E4 : {ens[4]} / {ens[4]-ens[0]:.3f} L:{Lps[4]} R: {Rps[4]}\n"
+                      f"            E5 : {ens[5]} / {ens[5]-ens[0]:.3f} L:{Lps[5]} R: {Rps[5]}\n"
+                      f"            E6 : {ens[6]} / {ens[6]-ens[0]:.3f} L:{Lps[6]} R: {Rps[6]}\n"
+                      f"            E7 : {ens[7]} / {ens[7]-ens[0]:.3f} L:{Lps[7]} R: {Rps[7]}\n")
+        return all_res
+
     def run_transitions(self):
         from TransitionMoments import TransitionMoments
-        trans_mom_obj = TransitionMoments(self.DegreeDVRresults, self.PORresults, self.MoleculeInfo,
-                                          transition=self.transition, MatSize=self.PORparams["HamSize"])
+        if "None" in self.PORparams:
+            trans_mom_obj = TransitionMoments(self.DegreeDVRresults, self.torDVRresults, self.MoleculeInfo,
+                                              self.PORparams, transition=self.transition)
+        else:
+            trans_mom_obj = TransitionMoments(self.DegreeDVRresults, self.PORresults, self.MoleculeInfo,
+                                              self.PORparams, transition=self.transition)
         if "EmilData" in self.PORparams:
             print("calculating intensities using CCSD")
             intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
                                                        numEstates=self.Intenseparams["numEstates"],
                                                        FC=self.Intenseparams["FranckCondon"],
                                                        twoD=self.PORparams["twoD"], ccsd=True)
+            trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
+                                                       numEstates=self.Intenseparams["numEstates"],
+                                                       FC=self.Intenseparams["FranckCondon"],
+                                                       twoD=self.PORparams["twoD"])
         else:
             intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
                                                        numEstates=self.Intenseparams["numEstates"],
                                                        FC=self.Intenseparams["FranckCondon"],
                                                        twoD=self.PORparams["twoD"])
-            # trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
-            #                                            numEstates=self.Intenseparams["numEstates"],
-            #                                            FC=self.Intenseparams["FranckCondon"],
-            #                                            twoD=self.PORparams["twoD"])
+            trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
+                                                       numEstates=self.Intenseparams["numEstates"],
+                                                       FC=self.Intenseparams["FranckCondon"],
+                                                       twoD=self.PORparams["twoD"])
         # ordered dict keyed by transition, holding a list (see below) for all the tor transitions
         # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol), BW, Boltzmann-Weighted Intensity (km/mol)]
         return intensities
@@ -474,7 +625,7 @@ class MoleculeResults:
     def run_StatTransitions(self):
         from TransitionMoments import TransitionMoments
         trans_mom_obj = TransitionMoments(self.DegreeDVRresults, self.PORresults, self.MoleculeInfo,
-                                          transition=self.transition, MatSize=self.PORparams["HamSize"])
+                                          self.PORparams, transition=self.transition)
         intensities = trans_mom_obj.calc_stat_intensity()
         # ordered dict keyed by transition, holding a list (see below) for all the tor transitions
         # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol)]

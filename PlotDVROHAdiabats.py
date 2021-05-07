@@ -7,7 +7,7 @@ params = {'text.usetex': False,
           'font.size': 10}
 plt.rcParams.update(params)
 
-def make_Wfnplots(gsResDict, esResDict, wfnns, lower_idx=(0, 1), upper_idx=(0, 1), filename=None):
+def make_Wfnplots(gsResDict, esResDict, lower_idx=(0, 1), upper_idx=(0, 1), filename=None):
     """To do this we will make a broken axis plot.. good to keep in back pocket.."""
     # 'break' the y-axis into two portions - use the top (ax2) for the upper level (gsResDict)
     # and the bottom (ax) for the lower level (gsResDict)
@@ -15,23 +15,23 @@ def make_Wfnplots(gsResDict, esResDict, wfnns, lower_idx=(0, 1), upper_idx=(0, 1
     # complete analysis and gather data
     x = np.linspace(0, 360, 100)
     en0g = Constants.convert(gsResDict['energy'][lower_idx[0]], "wavenumbers", to_AU=False)
-    wfn0g = wfnns[0][:, lower_idx[0]]
+    wfn0g = gsResDict['eigvecs'][:, lower_idx[0]]
     if wfn0g[21] < wfn0g[0]:
         wfn0g *= -1
     wfn0g = en0g + wfn0g * 10  # *10 for aestheics only (on all wfn)
     en1g = Constants.convert(gsResDict['energy'][lower_idx[1]], "wavenumbers", to_AU=False)
-    wfn1g = wfnns[0][:, lower_idx[1]]
+    wfn1g = gsResDict['eigvecs'][:, lower_idx[1]]
     if wfn1g[21] < wfn1g[0]:
         wfn1g *= -1
     wfn1g = en1g + wfn1g * 10  # *10 for aestheics only (on all wfn)
 
     en0e = Constants.convert(esResDict['energy'][upper_idx[0]], "wavenumbers", to_AU=False)
-    wfn0e = wfnns[0][:, upper_idx[0]]
+    wfn0e = esResDict['eigvecs'][:, upper_idx[0]]
     if wfn0e[21] < wfn0e[0]:
         wfn0e *= -1
     wfn0e = en0e + wfn0e * 10  # *10 for aestheics only (on all wfn)
     en1e = Constants.convert(esResDict['energy'][upper_idx[1]], "wavenumbers", to_AU=False)
-    wfn1e = wfnns[0][:, upper_idx[1]]
+    wfn1e = esResDict['eigvecs'][:, upper_idx[1]]
     if wfn1e[21] < wfn1e[0]:
         wfn1e *= -1
     wfn1e = en1e + wfn1e * 10  # *10 for aestheics only (on all wfn)
@@ -72,14 +72,15 @@ def make_Wfnplots(gsResDict, esResDict, wfnns, lower_idx=(0, 1), upper_idx=(0, 1
     else:
         f.savefig(f"{filename}.jpg", dpi=f.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
+        plt.close()
 
-def make_one_Wfn_plot(ResDict, wfnn, idx=(0, 1)):
+def make_one_Wfn_plot(ResDict, idx=(0, 1)):
     # complete analysis and gather data
     x = np.linspace(0, 360, 100)
     en0g = Constants.convert(ResDict['energy'][idx[0]], "wavenumbers", to_AU=False)
-    wfn0g = wfnn[:, idx[0]]  # *10 for aestheics only (on all wfn)
+    wfn0g = ResDict['eigvecs'][:, idx[0]]  # *10 for aestheics only (on all wfn)
     en1g = Constants.convert(ResDict['energy'][idx[1]], "wavenumbers", to_AU=False)
-    wfn1g = wfnn[:, idx[1]]
+    wfn1g = ResDict['eigvecs'][:, idx[1]]
     # plot
     colors = ["b", "r", "g", "indigo", "teal", "mediumvioletred"]
     plt.plot(x, np.repeat(0, len(x)), "-k", linewidth=3)
@@ -166,19 +167,19 @@ def make_Potplots(gsRes, esRes, numStates=4, potfunc="cos", ZPE=True, filename=N
     else:
         f.savefig(f"{filename}.jpg", dpi=f.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
+        plt.close()
 
-def make_one_Potplot(porRes, ZPE=False, filename=None):
+def make_one_Potplot(ResDict, ZPE=False, filename=None):
+    """send in the res dict of the one level you want"""
     from FourierExpansions import calc_curves
     fig = plt.figure(figsize=(7, 8), dpi=600)
     x = np.linspace(0, 360, 100)
     rad_x = np.linspace(0, 2*np.pi, 100)
-    if len(porRes["V"]) < 7:
-        porRes["V"] = np.hstack((porRes["V"], np.zeros(7 - len(porRes["V"]))))
-    Pot = Constants.convert(calc_curves(rad_x, porRes["V"]), "wavenumbers", to_AU=False)
+    Pot = Constants.convert(calc_curves(rad_x, ResDict["V"], function="fourier"), "wavenumbers", to_AU=False)
     enX = np.linspace(180 / 3, 2 * 180 - 180 / 3, 10)
     colors = ["b", "r", "g", "indigo", "teal", "mediumvioletred"]
     for i in np.arange(6):
-        en = Constants.convert(porRes['energy'][i], "wavenumbers", to_AU=False)
+        en = Constants.convert(ResDict['energy'][i], "wavenumbers", to_AU=False)
         if ZPE is False:
             en -= min(Pot)
         if i % 2 == 0:  # if even (lower)
@@ -198,6 +199,7 @@ def make_one_Potplot(porRes, ZPE=False, filename=None):
     else:
         fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
+        plt.close()
 
 def make_pot_comp_plot(fullporRes, filename=None):
     from FourierExpansions import calc_curves
@@ -222,40 +224,41 @@ def make_pot_comp_plot(fullporRes, filename=None):
     else:
         fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
+        plt.close()
 
 
-def make_PotWfnplots(porRes, wfnns, wfn_idx=[(0, 1)], ZPE=True, filename=None):
+def make_PotWfnplots(ResDict, wfn_idx=[0, 1], ZPE=True, filename=None):
     """ Plot the potential curves and energy levels of the given transitions. If ZPE plots include the ZPE,
     else they are plotted with the ZPE subtracted off so that min(gsPot) = 0 """
     from FourierExpansions import calc_curves
     fig = plt.figure(figsize=(7, 8), dpi=600)
-    x = np.linspace(0, 360, 100)
-    rad_x = np.linspace(0, 2 * np.pi, 100)
+    x = np.linspace(0, 360, len(ResDict["eigvecs"][:, 0]))
+    rad_x = np.radians(x)
     # create gs plot
-    if len(porRes["V"]) < 7:
-        porRes["V"] = np.hstack((porRes["V"], np.zeros(7 - len(porRes["V"]))))
-    gsPot = Constants.convert(calc_curves(rad_x, porRes["V"]), "wavenumbers", to_AU=False)
+    if len(ResDict["V"]) < 7:
+        ResDict["V"] = np.hstack((ResDict["V"], np.zeros(7 - len(ResDict["V"]))))
+    gsPot = Constants.convert(calc_curves(rad_x, ResDict["V"], function="fourier"), "wavenumbers", to_AU=False)
     colors = ["b", "r", "g", "indigo", "teal", "mediumvioletred"]
-    for tunnel_pair in wfn_idx:
-        en0g = Constants.convert(porRes['energy'][tunnel_pair[0]], "wavenumbers", to_AU=False)
+    for i in wfn_idx:
+        en0g = Constants.convert(ResDict['energy'][i], "wavenumbers", to_AU=False)
         if ZPE is False:
             en0g -= min(gsPot)
-        wfn0g = wfnns[:, tunnel_pair[0]]
-        if wfn0g[21] < wfn0g[0]:
+        wfn0g = ResDict["eigvecs"][:, i]
+        if wfn0g[150] < wfn0g[0]:
             wfn0g *= -1
-        plt_wfn0g = en0g + wfn0g * 100  # *100 for aestheics only (on all wfn)
+        plt_wfn0g = en0g + wfn0g * 500  # for aestheics only (on all wfn)
         plt.plot(x, np.repeat(en0g, len(x)), "-k", linewidth=2)
-        plt.plot(x, plt_wfn0g, color=colors[tunnel_pair[0]], linewidth=3)
+        plt.plot(x, plt_wfn0g, color=colors[i], linewidth=3)
 
-        en1g = Constants.convert(porRes['energy'][tunnel_pair[1]], "wavenumbers", to_AU=False)
-        if ZPE is False:
-            en1g -= min(gsPot)
-        wfn1g = wfnns[:, tunnel_pair[1]]
-        if wfn1g[21] < wfn0g[0]:
-            wfn1g *= -1
-        plt_wfn1g = en1g + wfnns[:, tunnel_pair[1]] * 100
-        plt.plot(x, np.repeat(en1g, len(x)), "-k", linewidth=2)
-        plt.plot(x, plt_wfn1g, color=colors[tunnel_pair[1]], linewidth=3)
+        # en1g = Constants.convert(ResDict['energy'][tunnel_pair[1]], "wavenumbers", to_AU=False)
+        # if ZPE is False:
+        #     en1g -= min(gsPot)
+        # wfn1g = ResDict["eigvecs"][:, tunnel_pair[1]]
+        # if wfn1g[21] < wfn0g[0]:
+        #     wfn1g *= -1
+        # plt_wfn1g = en1g + ResDict["eigvecs"][:, tunnel_pair[1]] * 100
+        # plt.plot(x, np.repeat(en1g, len(x)), "-k", linewidth=2)
+        # plt.plot(x, plt_wfn1g, color=colors[tunnel_pair[1]], linewidth=3)
 
     if ZPE is False:
         gsPot -= min(gsPot)
@@ -270,6 +273,7 @@ def make_PotWfnplots(porRes, wfnns, wfn_idx=[(0, 1)], ZPE=True, filename=None):
     else:
         fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
         print(f"Figure saved to {filename}")
+        plt.close()
 
 def make_scaledPots(mol_res_obj):
     from FourierExpansions import calc_curves
@@ -283,6 +287,3 @@ def make_scaledPots(mol_res_obj):
     plt.plot(x, Vel_wave, "-k", label=f"Electronic Energy + R Path")
     plt.show()
 
-if __name__ == '__main__':
-    # make_Wfnplots(res, doublet="lower", filename="VOH02_wfns")
-    make_Potplots(PORres[0], PORres[2], ZPE=False, filename="vOH02_woZPE")
