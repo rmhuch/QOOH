@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from Converter import Constants
-
+# THIS COULD USE A GOOD CLEAN UP
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
           'font.size': 10}
@@ -76,7 +76,8 @@ def make_Wfnplots(gsResDict, esResDict, lower_idx=(0, 1), upper_idx=(0, 1), file
 
 def make_one_Wfn_plot(ResDict, idx=(0, 1)):
     # complete analysis and gather data
-    x = np.linspace(0, 360, 100)
+    rad_x = ResDict["grid"]
+    x = np.degrees(rad_x)
     en0g = Constants.convert(ResDict['energy'][idx[0]], "wavenumbers", to_AU=False)
     wfn0g = ResDict['eigvecs'][:, idx[0]]  # *10 for aestheics only (on all wfn)
     en1g = Constants.convert(ResDict['energy'][idx[1]], "wavenumbers", to_AU=False)
@@ -173,8 +174,8 @@ def make_one_Potplot(ResDict, ZPE=False, filename=None):
     """send in the res dict of the one level you want"""
     from FourierExpansions import calc_curves
     fig = plt.figure(figsize=(7, 8), dpi=600)
-    x = np.linspace(0, 360, 100)
-    rad_x = np.linspace(0, 2*np.pi, 100)
+    rad_x = ResDict["grid"]
+    x = np.degrees(rad_x)
     Pot = Constants.convert(calc_curves(rad_x, ResDict["V"], function="fourier"), "wavenumbers", to_AU=False)
     enX = np.linspace(180 / 3, 2 * 180 - 180 / 3, 10)
     colors = ["b", "r", "g", "indigo", "teal", "mediumvioletred"]
@@ -232,8 +233,8 @@ def make_PotWfnplots(ResDict, wfn_idx=[0, 1], ZPE=True, filename=None):
     else they are plotted with the ZPE subtracted off so that min(gsPot) = 0 """
     from FourierExpansions import calc_curves
     fig = plt.figure(figsize=(7, 8), dpi=600)
-    x = np.linspace(0, 360, len(ResDict["eigvecs"][:, 0]))
-    rad_x = np.radians(x)
+    rad_x = ResDict["grid"]
+    x = np.degrees(rad_x)
     # create gs plot
     if len(ResDict["V"]) < 7:
         ResDict["V"] = np.hstack((ResDict["V"], np.zeros(7 - len(ResDict["V"]))))

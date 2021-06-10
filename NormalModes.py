@@ -38,17 +38,3 @@ def run(hessian, numcoord=None, mass=None, **opts):
     return modes
 
 
-if __name__ == '__main__':
-    main_dir = os.path.dirname(os.path.dirname(__file__))
-    freq_dir = os.path.join(main_dir, 'Roo Freqs', 'chks')
-    opts = {
-        'chk_file': os.path.join(freq_dir, 'rigid_RooFreq_1.970.fchk'),
-        'numcoord': 39,
-        'mass': (np.array(
-            (15.999, 15.999, 1.008, 2.014, 2.014, 15.999, 2.014, 2.014, 15.999, 2.014, 2.014, 2.014, 2.014)
-            )/0.00054858)  # tetramer
-    }
-
-    results = run(**opts)
-    print(results)
-

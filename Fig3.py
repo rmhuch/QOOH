@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from Converter import Constants
 from runTBHP import tbhp, tbhp_res_obj
+from runQOOH import qooh, qooh_res_obj
 
 params = {'text.usetex': False,
           'mathtext.fontset': 'dejavusans',
@@ -91,11 +92,10 @@ def make_ZPEplot(twoDcoeffs, fullcoeffs):
 
 
 if __name__ == '__main__':
-    wfns = np.loadtxt("TBHP Data/EqTOR_wfns_forMark.dat")
+    wfns = np.loadtxt("EqTOR_OHwfns_forCoire.dat")
     # make_ohPanel(wfns, "TBHP Data/Fig3_data_oh.csv")
-    ZPE_coeffs = np.load("/home/netid.washington.edu/rmhuch/udrive/TBHP/TBHP_Velcoeffs_6order_2D.npy")
-    Vel_coeffs = np.load("/home/netid.washington.edu/rmhuch/udrive/TBHP/TBHP_Velcoeffs_6order.npy")
-    make_ZPEplot(ZPE_coeffs, Vel_coeffs)
-    # res, torWfns = tbhp_res_obj.PORresults
+    # ZPE_coeffs = np.load("/home/netid.washington.edu/rmhuch/udrive/TBHP/TBHP_Velcoeffs_6order_2D.npy")
+    # Vel_coeffs = np.load("/home/netid.washington.edu/rmhuch/udrive/TBHP/TBHP_Velcoeffs_6order.npy")
+    # make_ZPEplot(ZPE_coeffs, Vel_coeffs)
     # make_torPanel(torWfns, "TBHP Data/Fig3_data_tor.csv")
     # plt.show()

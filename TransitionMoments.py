@@ -334,43 +334,64 @@ class TransitionMoments:
         return intensities  # ordered dict keyed by transition, holding a list of all the tor transitions
 
     # calculate overlap of torsion wfns with TDM
-    def calc_intensity(self, numGstates=4, numEstates=4, FC=False, twoD=False, ccsd=False):
+    def calc_intensity(self, numGstates=4, numEstates=4, FC=False, twoD=False):
         from collections import OrderedDict
         all_intensities = OrderedDict()
         for Tstring in self.transition:  # should be a list of strings
             print(Tstring)
             Glevel = int(Tstring[0])
             Exlevel = int(Tstring[-1])
-            if FC and not twoD and not ccsd:
-                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_FC_units.csv"
-                print(f"Reaction Path FC Energies/Wavefunctions \n {filename}")
-            elif FC and twoD and not ccsd:
-                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2DFC_units.csv"
-                print("2D FC Energies/Wavefunctions")
-            elif FC and ccsd and not twoD:
-                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_FC_CCSD.csv"
-            elif twoD and not FC and not ccsd:
-                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2D.csv"
-                print(f"2D TDM Energies/Wavefunctions \n {filename}")
-            else:
-                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}.csv"
-                print(f"Reaction Path TDM Energies/Wavefunctions \n {filename}")
-
             if "None" in self.PORparams:
+                if "scaled_barrier" in self.PORparams and twoD and FC:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_scaled2D_FC.csv"
+                    print(f"scaled 1+1 FC Energies/Wavefunctions \n {filename}")
+                elif "scaled_barrier" in self.PORparams and twoD:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_scaled2D.csv"
+                    print(f"scaled 1+1 TDM Energies/Wavefunctions \n {filename}")
+                elif "scaled_barrier" in self.PORparams and FC:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_scaledRP_FC.csv"
+                    print(f"scaled 1+1 TDM Energies/Wavefunctions \n {filename}")
+                elif "scaled_barrier" in self.PORparams:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_scaledRP.csv"
+                    print(f"scaled 1+harm+1 TDM Energies/Wavefunctions \n {filename}")
+                elif twoD and FC:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2DFC_units.csv"
+                    print("1+1 FC Energies/Wavefunctions")
+                elif FC:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_FC_units.csv"
+                    print(f"1+harm+1 FC Energies/Wavefunctions \n {filename}")
+                elif twoD:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2D_units.csv"
+                    print("1+1 TDM Energies/Wavefunctions")
+                else:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}.csv"
+                    print(f"1+harm+1 TDM Energies/Wavefunctions \n {filename}")
                 all_intensities[Tstring] = self.calc_DVR_intensity(filename, Tstring, numGstates, numEstates,
                                                                    derivatives=self.intensity_derivs, FC=FC)
             else:
+                if twoD and FC:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2DFC_units.csv"
+                    print("1+1 FC Energies/Wavefunctions")
+                elif twoD:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2D_units.csv"
+                    print("1+1 TDM Energies/Wavefunctions")
+                elif FC:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_FC_units.csv"
+                    print(f"1+harm+1 FC Energies/Wavefunctions \n {filename}")
+                else:
+                    filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}.csv"
+                    print(f"1+harm+1 TDM Energies/Wavefunctions \n {filename}")
                 all_intensities[Tstring] = self.calc_POR_intensity(filename, Tstring, numGstates, numEstates,
                                                                    derivatives=self.intensity_derivs, FC=FC)
         return all_intensities
 
-    def plot_sticks(self, numGstates=4, numEstates=4, FC=False, twoD=False, ccsd=False):
+    def plot_sticks(self, numGstates=4, numEstates=4, FC=False, twoD=False):
         import matplotlib.pyplot as plt
         params = {'text.usetex': False,
                   'mathtext.fontset': 'dejavusans',
                   'font.size': 10}
         plt.rcParams.update(params)
-        dat = self.calc_intensity(numGstates=numGstates, numEstates=numEstates, FC=FC, twoD=twoD, ccsd=ccsd)
+        dat = self.calc_intensity(numGstates=numGstates, numEstates=numEstates, FC=FC, twoD=twoD)
         lims = [(3600, 3900), (7000, 7250), (10250, 10550), (13300, 13900), (16300, 16600)]
         for i, Tstring in enumerate(self.transition):
             spect_dat = np.array(dat[Tstring])

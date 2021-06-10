@@ -85,7 +85,6 @@ class PiDVR:
         from FourierExpansions import calc_curves
         import matplotlib.pyplot as plt
         Tmat = self.get_T()  # nxn
-        plt.matshow(Tmat)
         G_tau = calc_curves(self.grid, self.GmatCoeffs, function="fourier")
         # dG2_tau = self.calc_Gderivs()
         # G2_mat = np.diag(dG2_tau)  # project gmat out to diagonal like potential
@@ -101,10 +100,15 @@ class PiDVR:
         Ham = self.Potential + self.KineticEnergy
         energy, eigvecs = np.linalg.eigh(Ham)
         vals, barrier = self.calc_barrier(self.PotentialCoeffs)
+        if "desired_energies" in self.params:
+            end = self.params["desired_energies"]
+            energy = energy[:end]
+            eigvecs = eigvecs[:, :end]
         probabilites = self.calc_probs(eigvecs)  # tuple, 0 is left side, 1 is right side
         res = {'minima': vals,
                'barrier': barrier,
                'V': self.PotentialCoeffs,
+               'grid': self.grid,
                'energy': energy,
                'eigvecs': eigvecs,
                'probs': probabilites}

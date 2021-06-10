@@ -60,7 +60,7 @@ class FchkInterpreter:
 
     def get_hess(self):
         """Pulls the Hessian (Force Constants) from a Gaussian Frequency output file
-            :arg chk_file: a Gaussian Frequency formatted checkpoint file
+            :arg fchk_file: a Gaussian Frequency formatted checkpoint file
             :returns hess: full Hessian of system as an np.array"""
 
         for fchk in self.fchks:

@@ -4,7 +4,7 @@ from Converter import Constants
 # These functions are implemented in the TorsionPOR class
 
 def scale_barrier(energy_dat, barrier_height, scaling_factor):
-    """finds the minima and cuts those points between, scales barrier and returns full data set back"""
+    """finds equivalent minima and cuts those points between, scales barrier and returns full data set back"""
     print(f"Beginning Electronic Barrier Scaling")
     energy_dat[:, 0] = np.radians(energy_dat[:, 0])
     mins = np.argsort(energy_dat[:, 1])
@@ -35,6 +35,31 @@ def scale_barrier(energy_dat, barrier_height, scaling_factor):
         raise Exception("Can not scale with barrier_height or scaling_factor undefined")
     return scaling_factor, scaled_energies  # float64, [degree, energy]
 
+def scale_uneven_barrier(energy_dat, barrier_height):
+    """ scales maximum to given value, by scaling the left to the left minimum and right to right minimum
+        energy_dat: 2D array - torsion angles (degrees), energies (hartree)
+        barrier_height: final barrier height (wavenumbers)"""
+    print(f"Scaling Electronic Barrier to {barrier_height} cm^-1")
+    bh_au = Constants.convert(barrier_height, "wavenumbers", to_AU=True)
+    center_args = np.nonzero(energy_dat[:, 0] == 100)[0], np.nonzero(energy_dat[:, 0] == 260)[0]
+    max_arg = np.argmax(energy_dat[int(center_args[0]):int(center_args[1]), 1]) + int(center_args[0])
+    leftM_arg = np.argmin(energy_dat[:max_arg, 1])
+    rightM_arg = np.argmin(energy_dat[max_arg:, 1]) + max_arg
+    # scale LHS
+    DeltaEl = energy_dat[max_arg, 1] - energy_dat[leftM_arg, 1]
+    beta = (bh_au - energy_dat[leftM_arg, 1]) / DeltaEl
+    scaled_left = ((energy_dat[leftM_arg:max_arg, 1] - energy_dat[leftM_arg, 1]) * beta) + energy_dat[leftM_arg, 1]
+    left_dat = np.column_stack((energy_dat[leftM_arg:max_arg, 0], scaled_left))
+    # scale RHS
+    DeltaEr = energy_dat[max_arg, 1] - energy_dat[rightM_arg, 1]
+    alpha = (bh_au - energy_dat[rightM_arg, 1]) / DeltaEr
+    scaled_right = ((energy_dat[max_arg:rightM_arg, 1] - energy_dat[rightM_arg, 1]) * alpha) + energy_dat[rightM_arg, 1]
+    right_dat = np.column_stack((energy_dat[max_arg:rightM_arg, 0], scaled_right))
+    # stack together
+    scaling_factors = (beta, alpha)  # return L/R scaling factors in tuple
+    scaled_energies = np.vstack((energy_dat[:leftM_arg, :], left_dat, right_dat, energy_dat[rightM_arg:, :]))
+    return scaling_factors, scaled_energies
+
 def scale_full_barrier(energy_dat, barrier_height):
     """scales barrier of full data set"""
     print(f"Beginning Full Scaling to {barrier_height} cm^-1")
@@ -51,18 +76,5 @@ def scale_full_barrier(energy_dat, barrier_height):
     scaled_energies = np.column_stack((energy_dat[:, 0], scaling_factor*energy_dat[:, 1]))
     return scaling_factor, scaled_energies  # float64, [degree, energy]
 
-def calc_scaled_Vcoeffs(energy_dat, Vcoeffs, ens_to_calc, barrier_height, scaling_factor, order):
-    from FourierExpansions import calc_cos_coefs, calc_4cos_coefs
-    scaling_factor, scaled_energies = scale_barrier(energy_dat, barrier_height, scaling_factor)
-    if order == 6:
-        newVel = calc_cos_coefs(scaled_energies)
-    elif order == 4:
-        newVel = calc_4cos_coefs(scaled_energies)
-    else:
-        raise Exception(f"{order}th order expansions not currently supported")
-    scaled_coeffs = dict()
-    scaled_coeffs["Vel"] = newVel
-    for i in np.arange(len(Vcoeffs.keys())-1):  # loop through saved energies
-        scaled_coeffs[f"V{i}"] = newVel + Vcoeffs[f"V{i}"]
-    return scaled_coeffs
+
 

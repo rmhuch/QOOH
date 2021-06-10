@@ -189,41 +189,33 @@ class MoleculeResults:
     @property
     def VelCoeffs(self):
         if self._VelCoeffs is None:
-            if "EmilData" in self.PORparams or "MixedData1" in self.PORparams:
-                resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
-                                           f"{self.MoleculeInfo.MoleculeName}_Emil_Velcoeffs_4order.npy")
-                if os.path.exists(resultspath):
-                    print(f"Using {resultspath} to calculate Vel + ZPE coeffs")
-                    self._VelCoeffs = np.load(resultspath)
-                else:
-                    print(f"{resultspath} not found. beginning Vel + ZPE calculation")
-                    results = self.calculate_VelwZPE()
-                    self._VelCoeffs = np.load(results)
-            else:
-                if self.PORparams["None"] and self.PORparams["twoD"] is False:
+            if self.PORparams["None"]:
+                if self.PORparams["twoD"] and "scaled_barrier" in self.PORparams:
                     resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
-                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.npy")
-                elif self.PORparams["None"] and self.PORparams["twoD"]:
-                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
-                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.npy")
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D_scaledVel.npy")
                 elif self.PORparams["twoD"]:
                     resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.npy")
+                elif "scaled_barrier" in self.PORparams:
+                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_scaledVel.npy")
+                else:
+                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
+                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.npy")
+            else:
+                if self.PORparams["twoD"]:
+                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
                                                f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy")
-                elif self.PORparams["Vexpansion"] is "sixth":
+                else:
                     resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
                                                f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.npy")
-                elif self.PORparams["Vexpansion"] is "fourth":
-                    resultspath = os.path.join(self.MoleculeInfo.MoleculeDir,
-                                               f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.npy")
-                else:
-                    raise Exception(f"Can not expand Vel in {self.PORparams['Vexpansion']}")
-                if os.path.exists(resultspath):
-                    print(f"Using {resultspath} to calculate Vel + ZPE coeffs")
-                    self._VelCoeffs = np.load(resultspath, allow_pickle=True)
-                else:
-                    print(f"{resultspath} not found. beginning Vel + ZPE calculation")
-                    results = self.calculate_VelwZPE()
-                    self._VelCoeffs = np.load(results)
+            if os.path.exists(resultspath):
+                print(f"Using {resultspath} to calculate Vel + ZPE coeffs")
+                self._VelCoeffs = np.load(resultspath, allow_pickle=True)
+            else:
+                print(f"{resultspath} not found. beginning Vel + ZPE calculation")
+                results = self.calculate_harmZPE()
+                self._VelCoeffs = np.load(results)
         return self._VelCoeffs
 
     @property
@@ -318,7 +310,6 @@ class MoleculeResults:
         return rxn_path_res
 
     def plot_fourier(self):
-        from Converter import Constants
         from FourierExpansions import fourier_coeffs, calc_curves, calc_cos_coefs
         import matplotlib.pyplot as plt
         interp_degree = np.linspace(0, 360, 100)
@@ -336,19 +327,32 @@ class MoleculeResults:
         plt.plot(interp_degree, interp2)
         plt.show()
 
-    def calculate_VelwZPE(self):
+    def calculate_Vel(self):
+        if "scaled_barrier" in self.PORparams:
+            import matplotlib.pyplot as plt
+            from scaleTORpotentials import scale_uneven_barrier
+            ens = self.RxnPathResults["electronicE"][:, 1] - min(self.RxnPathResults["electronicE"][:, 1])
+            # we subtract the min off so energies are positive for scaling
+            dat = np.column_stack((self.RxnPathResults["electronicE"][:, 0], ens))
+            sf, scaled_energies = scale_uneven_barrier(dat, self.PORparams["scaled_barrier"])
+            Vel = scaled_energies[:, 1] + min(self.RxnPathResults["electronicE"][:, 1])
+            # then we add the scaling energy back on..
+            print("Scaling Factors: ", sf)
+        else:
+            Vel = self.RxnPathResults["electronicE"][:, 1]
+        return Vel  # returns 1D array of electronic energies in Hartree and < 0
+
+    def calculate_harmZPE(self):
         from Converter import Constants
-        from FourierExpansions import calc_cos_coefs, calc_4cos_coefs, fourier_coeffs, calc_curves
+        from FourierExpansions import calc_cos_coefs, fourier_coeffs, calc_curves
         degree_vals = np.linspace(0, 360, len(self.MoleculeInfo.TorFiles))
-        norm_grad = self.RxnPathResults["norm_grad"]
-        idx = np.where(norm_grad[:, 1] > 4E-4)
+        idx = np.where(self.RxnPathResults["norm_grad"][:, 1] > 4E-4)
         new_degree = degree_vals[idx]
-        Vel = self.RxnPathResults["electronicE"][:, 1]
+        Vel = self.calculate_Vel()
         Vel_ZPE_dict = dict()
         ZPE_dict = dict()
         for i, j in enumerate(degree_vals):
             freqs = self.RxnPathResults[j]["freqs"]  # in hartree
-            # print(np.column_stack((j, freqs[-1])))
             nonzero_freqs = freqs[7:-1]  # throw out translations/rotations and OH frequency
             nonzero_freqs_har = Constants.convert(nonzero_freqs, "wavenumbers", to_AU=True)
             ZPE = np.sum(nonzero_freqs_har) / 2
@@ -360,70 +364,42 @@ class MoleculeResults:
                 ZPE_dict[j] = ZPE
             else:
                 pass
-        if "EmilData" in self.PORparams or "MixedData1" in self.PORparams:
-            # put together ZPE
-            print("CCSD Vel")
-            ZPE = np.array([(d, v) for d, v in ZPE_dict.items()])
-            sort_idxZ = np.argsort(ZPE[:, 0])
-            ZPE = ZPE[sort_idxZ]
-            ZPE[:, 0] = np.radians(ZPE[:, 0])
-            fit_ZPE = calc_4cos_coefs(ZPE)
-            # zpe_y = calc_curves(np.radians(np.arange(0, 360, 1)), fit_ZPE, function="4cos")
-            emil_angles = self.RxnPathResults["EmilelectronicE"][:, 0]
-            emil_ZPE = calc_curves(np.radians(emil_angles), fit_ZPE, function="4cos")
-            Vel_ZPE = np.column_stack((np.radians(emil_angles), emil_ZPE+self.RxnPathResults["EmilelectronicE"][:, 1]))
-            VelwZPE_coeffs1 = calc_4cos_coefs(Vel_ZPE)
-            new_x = np.radians(np.arange(0, 360, 1))
-            y = calc_curves(new_x, VelwZPE_coeffs1, function="4cos")
+        Vel_ZPE = np.array([(d, v) for d, v in Vel_ZPE_dict.items()])
+        sort_idx = np.argsort(Vel_ZPE[:, 0])
+        Vel_ZPE = Vel_ZPE[sort_idx]
+        Vel_ZPE[:, 0] = np.radians(Vel_ZPE[:, 0])
+        new_x = np.radians(np.arange(0, 360, 1))
+        if self.PORparams["None"]:
+            VelwZPE_coeffs1 = fourier_coeffs(Vel_ZPE)
+            y = calc_curves(new_x, VelwZPE_coeffs1, function="fourier")
             y -= min(y)  # shift curve so minima are at 0 instead of negative
-            VelwZPE_coeffs = calc_4cos_coefs(np.column_stack((new_x, y)))
-            npy_name = f"{self.MoleculeInfo.MoleculeName}_Emil_Velcoeffs_4order.npy"
-            csv_name = f"{self.MoleculeInfo.MoleculeName}_Emil_Velcoeffs_4order.csv"
-        else:
-            print("DFT Vel")
-            Vel_ZPE = np.array([(d, v) for d, v in Vel_ZPE_dict.items()])
-            sort_idx = np.argsort(Vel_ZPE[:, 0])
-            Vel_ZPE = Vel_ZPE[sort_idx]
-            Vel_ZPE[:, 0] = np.radians(Vel_ZPE[:, 0])
-            new_x = np.radians(np.arange(0, 360, 1))
-            if "MixedData2" in self.PORparams or self.PORparams["Vexpansion"] is "fourth":
-                VelwZPE_coeffs1 = calc_4cos_coefs(Vel_ZPE)
-                y = calc_curves(new_x, VelwZPE_coeffs1, function="4cos")
-                y -= min(y)  # shift curve so minima are at 0 instead of negative
-                VelwZPE_coeffs = calc_4cos_coefs(np.column_stack((new_x, y)))
-                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.npy"
-                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_4order.csv"
-            elif self.PORparams["None"] and self.PORparams["twoD"]:
-                VelwZPE_coeffs1 = fourier_coeffs(Vel_ZPE)
-                y = calc_curves(new_x, VelwZPE_coeffs1, function="fourier")
-                y -= min(y)  # shift curve so minima are at 0 instead of negative
-                VelwZPE_coeffs = fourier_coeffs(np.column_stack((new_x, y)))
-                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.npy"
-                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.csv"
-            elif self.PORparams["None"] and self.PORparams["twoD"] is False:
-                VelwZPE_coeffs1 = fourier_coeffs(Vel_ZPE)
-                y = calc_curves(new_x, VelwZPE_coeffs1, function="fourier")
-                y -= min(y)  # shift curve so minima are at 0 instead of negative
-                VelwZPE_coeffs = fourier_coeffs(np.column_stack((new_x, y)))
-                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.npy"
-                csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.csv"
+            VelwZPE_coeffs = fourier_coeffs(np.column_stack((new_x, y)))
+            if self.PORparams["twoD"] and "scaled_barrier" in self.PORparams:
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D_scaledVel.npy"
+                # csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D_scaledVel.csv"
             elif self.PORparams["twoD"]:
-                VelwZPE_coeffs1 = calc_cos_coefs(Vel_ZPE)
-                y = calc_curves(new_x, VelwZPE_coeffs1)
-                y -= min(y)  # shift curve so minima are at 0 instead of negative
-                VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.npy"
+                # csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_2D.csv"
+            elif "scaled_barrier" in self.PORparams:
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_scaledVel.npy"
+                # csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin_scaledVel.csv"
+            else:
+                npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.npy"
+                # csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6cos6sin.csv"
+        else:
+            VelwZPE_coeffs1 = calc_cos_coefs(Vel_ZPE)
+            y = calc_curves(new_x, VelwZPE_coeffs1)
+            y -= min(y)  # shift curve so minima are at 0 instead of negative
+            VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
+            if self.PORparams["twoD"]:
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.npy"
                 csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order_2D.csv"
             else:
-                VelwZPE_coeffs1 = calc_cos_coefs(Vel_ZPE)
-                y = calc_curves(new_x, VelwZPE_coeffs1)
-                y -= min(y)  # shift curve so minima are at 0 instead of negative
-                VelwZPE_coeffs = calc_cos_coefs(np.column_stack((new_x, y)))
                 npy_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.npy"
                 csv_name = f"{self.MoleculeInfo.MoleculeName}_Velcoeffs_6order.csv"
         # save results
         np.save(os.path.join(self.MoleculeInfo.MoleculeDir, npy_name), VelwZPE_coeffs)
-        np.savetxt(os.path.join(self.MoleculeInfo.MoleculeDir, csv_name), VelwZPE_coeffs)
+        # np.savetxt(os.path.join(self.MoleculeInfo.MoleculeDir, csv_name), VelwZPE_coeffs)
         return os.path.join(self.MoleculeInfo.MoleculeDir, npy_name)
 
     def make_diff_freq_plots(self):
@@ -567,7 +543,8 @@ class MoleculeResults:
         for i in np.arange(len(pot_coeffs.keys()) - 1):
             pot_coeffs1 = pot_coeffs["Vel"] + pot_coeffs[f"V{i}"]
             DVRobj = PiDVR(PotentialCoeffs=pot_coeffs1,
-                           GmatCoeffs=self.fittedGmatrix[i], Nval=100)
+                           GmatCoeffs=self.fittedGmatrix[i], Nval=100,
+                           params={"desired_energies": self.DVRparams["desired_energies"]})
             all_res.append(DVRobj.Results)
         if "PrintResults" in self.DVRparams:
             for i in np.arange(len(all_res)):
@@ -599,25 +576,15 @@ class MoleculeResults:
         else:
             trans_mom_obj = TransitionMoments(self.DegreeDVRresults, self.PORresults, self.MoleculeInfo,
                                               self.PORparams, transition=self.transition)
-        if "EmilData" in self.PORparams:
-            print("calculating intensities using CCSD")
-            intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
-                                                       numEstates=self.Intenseparams["numEstates"],
-                                                       FC=self.Intenseparams["FranckCondon"],
-                                                       twoD=self.PORparams["twoD"], ccsd=True)
-            trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
-                                                       numEstates=self.Intenseparams["numEstates"],
-                                                       FC=self.Intenseparams["FranckCondon"],
-                                                       twoD=self.PORparams["twoD"])
-        else:
-            intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
-                                                       numEstates=self.Intenseparams["numEstates"],
-                                                       FC=self.Intenseparams["FranckCondon"],
-                                                       twoD=self.PORparams["twoD"])
-            trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
-                                                       numEstates=self.Intenseparams["numEstates"],
-                                                       FC=self.Intenseparams["FranckCondon"],
-                                                       twoD=self.PORparams["twoD"])
+
+        intensities = trans_mom_obj.calc_intensity(numGstates=self.Intenseparams["numGstates"],
+                                                   numEstates=self.Intenseparams["numEstates"],
+                                                   FC=self.Intenseparams["FranckCondon"],
+                                                   twoD=self.PORparams["twoD"])
+        # trans_mom_obj.plot_sticks(numGstates=self.Intenseparams["numGstates"],
+        #                                            numEstates=self.Intenseparams["numEstates"],
+        #                                            FC=self.Intenseparams["FranckCondon"],
+        #                                            twoD=self.PORparams["twoD"])
         # ordered dict keyed by transition, holding a list (see below) for all the tor transitions
         # [tor gstate, tor exstate, frequency (cm^-1), intensity (km/mol), BW, Boltzmann-Weighted Intensity (km/mol)]
         return intensities

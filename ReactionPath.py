@@ -52,7 +52,7 @@ def NormModeFreqs(fchk_names):
     resAU = run(hess, numCoords, mass)
     freqsAU = np.sqrt(resAU["freq2"])
     freqs = Constants.convert(freqsAU, "wavenumbers", to_AU=False)
-    # print(freqs)
+    # print(freqs[-1])
     return freqs
 
 def mwFMatrix(data):
@@ -233,6 +233,7 @@ def run_energies(fchk_dir, fchk_names):
         # save modes & freqs in nested dictionary keyed by degree value
         degree_dict["modes"] = np.row_stack((coords.flatten(), qn.T))
         degree_dict["freqs"] = np.sign(freqs2) * Constants.convert(np.sqrt(np.abs(freqs2)), "wavenumbers", to_AU=False)
+        # print(degree_dict["freqs"][-1])
         # save electronicE and norm(gradient) to res_dict when full
         electronicE[i] = np.column_stack((int(j), data.MP2Energy))
         norm_grad[i] = np.column_stack((int(j), np.linalg.norm(data.gradient)))
@@ -252,32 +253,13 @@ def run_Emil_energies(datfile):
 
 if __name__ == '__main__':
     udrive = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    # OHdir = os.path.join(udrive, "TBHP", "eq_scans")
-    # OHfreqdir = os.path.join(OHdir, "oh_mode_freqs")
-    # OHfiles = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]
-    # OHvals = ["09", "10", "11", "12", "13", "14", "15", "16"]
-    #
-    # for i in OHfiles:
-    #     fn = os.path.join(OHdir, f"tbhp_eq_{i}.fchk")
-    #     run(fn, f"tbhp_eq_{i}oh")
-    #
-    TORdir = os.path.join(udrive, "TBHP", "TorFchks")
-    torfiles = ["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100", "110", "120",
-                "130", "140", "150", "160", "170", "180", "190", "200", "210", "220", "230", "240", "250",
-                "260", "270", "280", "290", "300", "310", "320", "330", "340", "350", "360"]
-    zpe_mat = np.zeros((len(torfiles), 3))
-    degree = np.arange(0, 370, 10)
-    for i, j in enumerate(torfiles):
-        fnn = os.path.join(TORdir, f"tbhp_{j}.fchk")
-        zpe, elE = run_energies(fnn, f"tbhp_{j}tor")
-        zpe_mat[i] = np.column_stack((degree[i], zpe, elE))
-    zpe_mat[:, 2] -= min(zpe_mat[:, 2])
-    plt.plot(zpe_mat[:, 0], zpe_mat[:, 1]+zpe_mat[:, 2])
-    plt.show()
+    TORdir = os.path.join(udrive, "QOOH", "CH2TorFchks", "m1")
+    torfiles = [f"{i}.fchk" for i in ["000", "010", "020", "030", "040", "050", "060", "070", "080", "090", "100",
+                                          "110", "120", "130", "140", "150", "160", "170", "180", "190", "200", "210",
+                                          "220", "230", "240", "250", "260", "270", "280", "290", "300", "310", "320",
+                                          "330", "340", "350", "360"]]
+    test = run_energies(TORdir, torfiles)
+    for k in torfiles:
+        NormModeFreqs(os.path.join(TORdir, k))
 
-    VIBdir = os.path.join(udrive, "TBHP", "VibStateFchks")
-    vibfiles = np.arange(7)
-    for k in vibfiles:
-        fname = os.path.join(VIBdir, f"tbhp_eq_v{k}.fchk")
-        run_modes(fname, f"tbhp_eq_v{k}")
 
