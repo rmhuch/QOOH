@@ -64,10 +64,10 @@ class TorTorGmatrix:
                        (1 / np.tan(ic["phi123"]))) * np.cos(ic["tau1235"]))
         return Gbc
 
-    def calc_GHdprimeHdprime(self):
-        """ calculates the HOOC torsion with HOOC torsion g-matrix element with H-1, O-2, O-3, C-4"""
+    def calc_GHdpHdp(self):
+        """ calculates the HOOC torsion with HOOC torsion g-matrix element with H''-1, O-2, O-3, C-4"""
         Ghh = np.zeros(self.matsize)
-        masses = [self.massarray[6], self.massarray[4], self.massarray[5], self.massarray[0]]
+        masses = [self.massarray[6], self.massarray[5], self.massarray[4], self.massarray[0]]
         for i in np.arange(len(self.matsize[0])):
             for j in np.arange(len(self.matsize[1])):
                 lin_idx = i*self.matsize[1] + j
@@ -79,7 +79,15 @@ class TorTorGmatrix:
                 Ghh[i, j] = self.calc_Gaa(masses, ic)
         return Ghh
 
-    def calc_GHprimeHprime(self):
+    def calc_GHpHp(self):
+        GHH = np.zeros(self.matsize)
+        return GHH
+
+    def calc_GHH(self):
+        GHH = np.zeros(self.matsize)
+        return GHH
+
+    def calc_GHpH(self):
         GHH = np.zeros(self.matsize)
         return GHH
 

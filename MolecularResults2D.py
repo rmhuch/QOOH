@@ -3,13 +3,14 @@ import os
 
 
 class MoleculeInfo2D:
-    def __init__(self, MoleculeName, atom_array, eqTORangle, oh_scan_npz=None, tor_scan_npz=None, TorFchkDirectory=None,
-                 TorFiles=None, ModeFchkDirectory=None, ModeFiles=None, dipole_npz=None):
+    def __init__(self, MoleculeName, atom_array, eqTORangle, oh_scan_npz=None, tor_scan_npz=None, cartesians_npz=None,
+                 TorFchkDirectory=None, TorFiles=None, ModeFchkDirectory=None, ModeFiles=None, dipole_npz=None):
         self.MoleculeName = MoleculeName
         self.atom_array = atom_array
         self.eqTORangle = eqTORangle
         self.oh_scan_npz = oh_scan_npz
         self.tor_scan_npz = tor_scan_npz
+        self.cart_npz = cartesians_npz
         self.TorFchkDirectory = TorFchkDirectory  # to calculate Vel + rxn path
         self.TorFiles = TorFiles
         self.ModeFchkDirectory = ModeFchkDirectory  # to calculate modes from rxn path
@@ -19,6 +20,8 @@ class MoleculeInfo2D:
         self._mass_array = None
         self._OHScanData = None
         self._TORScanData = None
+        self._cartesians = None
+        self._GmatCoords = None
         self._DipoleMomentSurface = None
 
     @property
@@ -49,6 +52,18 @@ class MoleculeInfo2D:
         return self._TORScanData
 
     @property
+    def cartesians(self):
+        if self._cartesians is None:
+            self._cartesians = self.get_Data(npz_filename=self.cart_npz)
+        return self._cartesians
+
+    @property
+    def GmatCoords(self):
+        if self._GmatCoords is None:
+            self._GmatCoords = self.get_GmatCoords()
+        return self._GmatCoords
+
+    @property
     def DipoleMomentSurface(self):
         if self._DipoleMomentSurface is None:
             self._DipoleMomentSurface = np.load(os.path.join(self.MoleculeDir, self.dipole_npz))
@@ -62,6 +77,28 @@ class MoleculeInfo2D:
             vals = np.load(os.path.join(self.MoleculeDir, npz_filename), allow_pickle=True)
         # this loads in a dictionary of internals and energies for every point in the COOH, CH2, OH scan
         return vals
+
+    def get_GmatCoords(self):
+        """ Calculates extra internals and combines with other internal dictionary to return one groupedDict keyed by
+         tuple (COOH, OCCH) """
+        from Grouper import Grouper
+        from McUtils.Numputils import vec_angles
+        internals = self.TORScanData
+        coord_array = np.column_stack((list(internals.values())))
+        coord_names = list(internals.keys())
+        # calculate extra internals
+        carts = self.cartesians
+        ang_CCpH = []
+        ang_CCpHp = []
+        for file in carts.keys():
+            coord_array = carts[file]
+            ang_CCpH.extend(vec_angles(coord_array[:, 0]-coord_array[:, 1], coord_array[:, 3]-coord_array[:, 1]))
+            ang_CCpHp.extend(vec_angles(coord_array[:, 0]-coord_array[:, 1], coord_array[:, 4]-coord_array[:, 1]))
+        coord_array = np.column_stack((coord_array, ang_CCpH, ang_CCpHp))
+        coord_names.append("ACCpH", "ACCpHp")
+        groupedDict = Grouper  # PICK UP HERE
+        groupedDict["coord_names"] = coord_names
+        return groupedDict
 
     def plot_Surfaces(self, xcoord, ycoord, zcoord=None, title=None):
         import matplotlib.pyplot as plt
