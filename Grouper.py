@@ -90,7 +90,7 @@ class Grouper:
     
     @classmethod
     def group_by1d(cls, ar, keys, return_indices=False):
-        sorting = np.argsort(keys)
+        sorting = np.argsort(keys, kind='stable')
         uinds, mask = np.unique(keys[sorting], return_inverse=True)
         _, inds = np.unique(mask, return_index=True)
         groups = np.split(ar[sorting,], inds)[1:]
@@ -121,9 +121,9 @@ class Grouper:
             ret = cls.group_by1d(ar, keys, return_indices=return_indices)
             return ret
 
-        keys, dtype, orig_shape, orig_dtype = coerce_dtype(keys)
+        keys, dtype, orig_shape, orig_dtype = cls.coerce_dtype(keys)
         output = cls.group_by1d(ar, keys, return_indices=return_indices)
         ukeys, groups = output[0]
-        ukeys = uncoerce_dtype(ukeys, orig_shape, orig_dtype, None)
+        ukeys = cls.uncoerce_dtype(ukeys, orig_shape, orig_dtype, None)
         output = ((ukeys, groups),) + output[1:]
         return output

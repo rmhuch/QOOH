@@ -4,7 +4,7 @@ from Converter import Constants
 
 class TorTorGmatrix:
     def __init__(self, MoleculeObj, tor1key, tor2key):
-        self.TORScanData = MoleculeObj.TORScanData
+        self.GmatCoords = MoleculeObj.GmatCoords
         self.massarray = MoleculeObj.mass_array
         self.tor1key = tor1key
         self.tor2key = tor2key
@@ -14,8 +14,9 @@ class TorTorGmatrix:
     @property
     def matsize(self):
         if self._matsize is None:
-            tor_1 = np.unique(self.TORScanData[self.tor1key])
-            tor_2 = np.unique(self.TORScanData[self.tor2key])
+            # check these here
+            tor_1 = np.unique(self.GmatCoords.keys()[0])
+            tor_2 = np.unique(self.GmatCoords.keys()[1])
             self._matsize = (tor_1, tor_2)
         return self._matsize
 
@@ -70,24 +71,65 @@ class TorTorGmatrix:
         masses = [self.massarray[6], self.massarray[5], self.massarray[4], self.massarray[0]]
         for i in np.arange(len(self.matsize[0])):
             for j in np.arange(len(self.matsize[1])):
-                lin_idx = i*self.matsize[1] + j
-                ic = {'r12': self.TORScanData["B6"][lin_idx],
-                      'r34': self.TORScanData["B5"][lin_idx],
-                      'phi123': self.TORScanData["A5"][lin_idx],
-                      'phi234': self.TORScanData["A4"][lin_idx],
-                      'tau1234': self.TORScanData["D4"][lin_idx]}
+                HOOC = ...
+                OCCX = ...
+                ic = {'r12': self.GmatCoords[(HOOC, OCCX)]["B6"],
+                      'r34': self.GmatCoords[(HOOC, OCCX)]["B5"],
+                      'phi123': self.GmatCoords[(HOOC, OCCX)]["A5"],
+                      'phi234': self.GmatCoords[(HOOC, OCCX)]["A4"],
+                      'tau1234': self.GmatCoords[(HOOC, OCCX)]["D4"]}
                 Ghh[i, j] = self.calc_Gaa(masses, ic)
         return Ghh
 
     def calc_GHpHp(self):
+        """ calculates the OCC'H' torsion with OCC'H' torsion g-matrix element with H'-1, C'-2, C-3, O-4"""
         GHH = np.zeros(self.matsize)
+        masses = [self.massarray[2], self.massarray[1], self.massarray[0], self.massarray[4]]
+        for i in np.arange(len(self.matsize[0])):
+            for j in np.arange(len(self.matsize[1])):
+                HOOC = ...
+                OCCX = ...
+                ic = {'r12': self.GmatCoords[(HOOC, OCCX)]["B2"],
+                      'r34': self.GmatCoords[(HOOC, OCCX)]["B4"],
+                      'phi123': self.GmatCoords[(HOOC, OCCX)]["ACCpHp"],
+                      'phi234': self.GmatCoords[(HOOC, OCCX)]["A3"],
+                      'tau1234': self.GmatCoords[(HOOC, OCCX)]["D?"]}
+                GHH[i, j] = self.calc_Gaa(masses, ic)
         return GHH
 
     def calc_GHH(self):
+        """ calculates the OCC'H' torsion with OCC'H' torsion g-matrix element with H-1, C'-2, C-3, O-4"""
         GHH = np.zeros(self.matsize)
+        masses = [self.massarray[3], self.massarray[1], self.massarray[0], self.massarray[4]]
+        for i in np.arange(len(self.matsize[0])):
+            for j in np.arange(len(self.matsize[1])):
+                HOOC = ...
+                OCCX = ...
+                ic = {'r12': self.GmatCoords[(HOOC, OCCX)]["B3"],
+                      'r34': self.GmatCoords[(HOOC, OCCX)]["B4"],
+                      'phi123': self.GmatCoords[(HOOC, OCCX)]["ACCpH"],
+                      'phi234': self.GmatCoords[(HOOC, OCCX)]["A3"],
+                      'tau1234': self.GmatCoords[(HOOC, OCCX)]["D?"]}
+                GHH[i, j] = self.calc_Gaa(masses, ic)
         return GHH
 
     def calc_GHpH(self):
+        """ calculates the OCC'H' torsion with OCC'H torsion g-matrix element with O-1, C-2, C'-3, H'-4, H-5"""
         GHH = np.zeros(self.matsize)
+        masses = [self.massarray[4], self.massarray[0], self.massarray[1], self.massarray[2], self.massarray[3]]
+        for i in np.arange(len(self.matsize[0])):
+            for j in np.arange(len(self.matsize[1])):
+                HOOC = ...
+                OCCX = ...
+                ic = {'r12': self.GmatCoords[(HOOC, OCCX)]["B4"],
+                      'r23': self.GmatCoords[(HOOC, OCCX)]["B1"],
+                      'r34': self.GmatCoords[(HOOC, OCCX)]["B2"],
+                      'r35': self.GmatCoords[(HOOC, OCCX)]["B3"],
+                      'phi123': self.GmatCoords[(HOOC, OCCX)]["A3"],
+                      'phi234': self.GmatCoords[(HOOC, OCCX)]["ACCpH"],
+                      'phi235': self.GmatCoords[(HOOC, OCCX)]["ACCpHp"],
+                      'tau1234': self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"],
+                      'tau1235': self.GmatCoords[(HOOC, OCCX)]["DOCCpH"]}
+                GHH[i, j] = self.calc_Gaa(masses, ic)
         return GHH
 

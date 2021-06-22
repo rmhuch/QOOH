@@ -20,6 +20,7 @@ class MoleculeInfo2D:
         self._mass_array = None
         self._OHScanData = None
         self._TORScanData = None
+        self._TorScanDict = None
         self._cartesians = None
         self._GmatCoords = None
         self._DipoleMomentSurface = None
@@ -52,9 +53,15 @@ class MoleculeInfo2D:
         return self._TORScanData
 
     @property
+    def TorScanDict(self):
+        if self._TorScanDict is None:
+            self._TorScanDict = self.get_GroupedDict()
+        return self._TorScanDict
+
+    @property
     def cartesians(self):
         if self._cartesians is None:
-            self._cartesians = self.get_Data(npz_filename=self.cart_npz)
+            self._cartesians = self.get_finalCarts()
         return self._cartesians
 
     @property
@@ -78,27 +85,60 @@ class MoleculeInfo2D:
         # this loads in a dictionary of internals and energies for every point in the COOH, CH2, OH scan
         return vals
 
-    def get_GmatCoords(self):
-        """ Calculates extra internals and combines with other internal dictionary to return one groupedDict keyed by
-         tuple (COOH, OCCH) """
+    def get_GroupedDict(self):
+        """ Takes Internal Dict and converts it into a grouped nested, dict {(HOOC, OCCX} : {'coord_name' : val}
+         with val in degree/angstrom"""
         from Grouper import Grouper
-        from McUtils.Numputils import vec_angles
-        internals = self.TORScanData
-        coord_array = np.column_stack((list(internals.values())))
-        coord_names = list(internals.keys())
-        # calculate extra internals
-        carts = self.cartesians
-        ang_CCpH = []
-        ang_CCpHp = []
+        ints = self.TORScanData
+        all_names = ints.files
+        int_coord_array = np.column_stack((list(ints.values())))
+        group = Grouper(int_coord_array, (30, 28))  # groups into (HOOC, OCCX)
+        Gdict = {k: dict(zip(all_names, v[0])) for k, v in group.group_dict.items()}
+        return Gdict
+
+    def get_finalCarts(self):
+        """ Pulls Cartesians from scan file, then saves only the optimized geometry's cartesian coordinates as a grouped
+         dict {(HOOC, OCCX) : [cartesians] """
+        from Grouper import Grouper
+        from McUtils.Numputils import pts_dihedrals
+        carts = np.load(os.path.join(self.MoleculeDir, self.cart_npz), allow_pickle=True)
+        HOOC = []
+        OCCH = []
+        OCCHp = []
+        all_coords = []
         for file in carts.keys():
             coord_array = carts[file]
-            ang_CCpH.extend(vec_angles(coord_array[:, 0]-coord_array[:, 1], coord_array[:, 3]-coord_array[:, 1]))
-            ang_CCpHp.extend(vec_angles(coord_array[:, 0]-coord_array[:, 1], coord_array[:, 4]-coord_array[:, 1]))
-        coord_array = np.column_stack((coord_array, ang_CCpH, ang_CCpHp))
-        coord_names.append("ACCpH", "ACCpHp")
-        groupedDict = Grouper  # PICK UP HERE
-        groupedDict["coord_names"] = coord_names
-        return groupedDict
+            HOOC.extend(np.degrees(
+                pts_dihedrals(coord_array[:, 6], coord_array[:, 5], coord_array[:, 4], coord_array[:, 0])))
+            OCCH.extend(np.degrees(
+                pts_dihedrals(coord_array[:, 4], coord_array[:, 0], coord_array[:, 1], coord_array[:, 3])))
+            OCCHp.extend(np.degrees(
+                pts_dihedrals(coord_array[:, 4], coord_array[:, 0], coord_array[:, 1], coord_array[:, 2])))
+            all_coords.extend(coord_array)
+        HOOC = np.round(HOOC)
+        OCCH = np.round(OCCH)
+        OCCHp = np.round(OCCHp)
+        OCCX = (OCCH + OCCHp)/2
+        round_OCCX = np.round(OCCX/10)*10
+        HOOC = [x + 360 if x < 0 else x for x in HOOC]
+        round_OCCX = [x + 180 if x < 0 else x for x in round_OCCX]
+        groupie = Grouper(all_coords, np.array((HOOC, round_OCCX)).T)
+        all_carts = groupie.group_dict
+        finalCarts = {k: v[-1] for k, v in all_carts.items()}
+        return finalCarts
+
+    def get_GmatCoords(self):
+        """ Calculates extra internals from ^finalCarts and combines with other internal dictionary to return one
+        groupedDict keyed by tuple (COOH, OCCH) """
+        from McUtils.Numputils import vec_angles, pts_dihedrals
+        internals = self.TorScanDict
+        carts = self.cartesians
+        for k, coord_array in carts.items():
+            internals[k]["ACCpH"] = np.degrees(vec_angles(coord_array[0]-coord_array[1], coord_array[3]-coord_array[1])[0])
+            internals[k]["ACCpHp"] = np.degrees(vec_angles(coord_array[0]-coord_array[1], coord_array[4]-coord_array[1])[0])
+            internals[k]["DOCCpH"] = np.degrees(pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[3]))
+            internals[k]["DOCCpHp"] = np.degrees(pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[2]))
+        return internals
 
     def plot_Surfaces(self, xcoord, ycoord, zcoord=None, title=None):
         import matplotlib.pyplot as plt
