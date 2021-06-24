@@ -17,6 +17,12 @@ class TorTorGmatrix:
             self._diagGmatrix = self.calc_diagGmat()
         return self._diagGmatrix
 
+    @property
+    def fullGmatrix(self):
+        if self._diagGmatrix is None:
+            self._fullGmatrix = self.calc_fullGmat()
+        return self._fullGmatrix
+
     def calc_Gaa(self, masses, ic):
         """uses g_tau,tau (1234, 1234) from Frederick and Woywod J.Chem.Phys., doi: 140.254.87.101 to
         calculate the g-matrix of an input mass array and internal coordinate dictionary
@@ -52,7 +58,7 @@ class TorTorGmatrix:
         lambda_432 = (1 / np.sin(ic["phi234"])) * (1 / ic["r34"] - (np.cos(ic["phi234"]) / ic["r23"]))
         lambda_532 = (1 / np.sin(ic["phi235"])) * (1 / ic["r35"] - (np.cos(ic["phi235"]) / ic["r23"]))
         Gbc = (1 / (masses[0] * ic["r12"] ** 2 * np.sin(ic["phi123"]) ** 2)) + \
-              ((lambda_123 ** 2 / masses[0]) + ((1 / np.cos(ic["phi123"])) ** 2 / (masses[2] * ic["r23"] ** 3))) + \
+              ((lambda_123 ** 2 / masses[1]) + ((1 / np.tan(ic["phi123"])) ** 2 / (masses[2] * ic["r23"] ** 2))) + \
               (1 / (np.tan(ic["phi234"]) * np.tan(ic["phi235"]) * masses[1] * ic["r23"] ** 2) +
                (lambda_432 * lambda_532 / masses[2])) * np.cos(ic["tau1235"] - ic["tau1234"]) - (1 / ic["r23"]) * \
               (((lambda_123 / masses[1]) * (1 / np.tan(ic["phi234"])) + (lambda_432 / masses[2]) * (
@@ -89,7 +95,6 @@ class TorTorGmatrix:
             OCCX = k[1]
             tor1_ind = np.where(self.tor1key == HOOC)[0][0]
             tor2_ind = np.where(self.tor2key == OCCX)[0][0]
-            print(HOOC, OCCX)
             ic = {'r12': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B2"], "angstroms", to_AU=True),
                   'r23': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B1"], "angstroms", to_AU=True),
                   'r34': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B4"], "angstroms", to_AU=True),
@@ -97,6 +102,8 @@ class TorTorGmatrix:
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
+            if k == (260, 150):
+                print("GHpHp", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GHH(self):
@@ -115,6 +122,8 @@ class TorTorGmatrix:
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
+            if k == (260, 150):
+                print("GHH", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GHpH(self):
@@ -131,17 +140,32 @@ class TorTorGmatrix:
                   'r34': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B2"], "angstroms", to_AU=True),
                   'r35': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B3"], "angstroms", to_AU=True),
                   'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
-                  'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpH"]),
-                  'phi235': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpHp"]),
+                  'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpHp"]),
+                  'phi235': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpH"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"]),
                   'tau1235': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gbc(masses, ic)
+            if k == (260, 150):
+                print("GHpH", GHH[tor1_ind, tor2_ind])
+        return GHH
+
+    def calc_GHHdp(self):
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
+        ...
+        return GHH
+
+    def calc_GHpHdp(self):
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
+        ...
         return GHH
 
     def calc_diagGmat(self):
         """calculate the diagonal terms of the full Gmatrix, ie GXX and GHprimeHprime"""
-        GHpHp = self.calc_GHpHp()
-        # PICK UP HERE!!
-        GXX = ...
-        diag_Gmat = GHpHp + GXX
-        return diag_Gmat
+        GHdpHdp = self.calc_GHdpHdp()
+        GXX = (1/4) * (self.calc_GHH() + self.calc_GHpHp() + self.calc_GHpH())
+        return GHdpHdp, GXX
+
+    def calc_fullGmat(self):
+        GHdpHdp, GXX = self.calc_diagGmat()
+        GXHdp = (1/2) * (self.calc_GHHdp() + self.calc_GHpHdp())
+        return GHdpHdp, GXX, GXHdp

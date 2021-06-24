@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from PyDVR.DVR import *
 
 
 class MoleculeInfo2D:
@@ -23,7 +24,8 @@ class MoleculeInfo2D:
         self._TorScanDict = None
         self._cartesians = None
         self._GmatCoords = None
-        self._Gmatrix = None
+        self._diagGmatrix = None
+        self._fullGmatrix = None
         self._DipoleMomentSurface = None
 
     @property
@@ -72,10 +74,16 @@ class MoleculeInfo2D:
         return self._GmatCoords
 
     @property
-    def Gmatrix(self):
-        if self._Gmatrix is None:
-            self._Gmatrix = self.get_Gmatrix()
-        return self._Gmatrix
+    def diagGmatrix(self):
+        if self._diagGmatrix is None:
+            self._diagGmatrix = self.get_Gmatrix(kind="diag")
+        return self._diagGmatrix
+
+    @property
+    def fullGmatrix(self):
+        if self._fullGmatrix is None:
+            self._fullGmatrix = self.get_Gmatrix(kind="full")
+        return self._fullGmatrix
 
     @property
     def DipoleMomentSurface(self):
@@ -153,17 +161,49 @@ class MoleculeInfo2D:
         internals = self.TorScanDict
         carts = self.cartesians
         for k, coord_array in carts.items():
-            internals[k]["ACCpH"] = np.degrees(vec_angles(coord_array[0]-coord_array[1], coord_array[3]-coord_array[1])[0])
-            internals[k]["ACCpHp"] = np.degrees(vec_angles(coord_array[0]-coord_array[1], coord_array[4]-coord_array[1])[0])
-            internals[k]["DOCCpH"] = np.degrees(pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[3]))
-            internals[k]["DOCCpHp"] = np.degrees(pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[2]))
+            internals[k]["ACCpH"] = np.degrees(
+                vec_angles(coord_array[0]-coord_array[1], coord_array[3]-coord_array[1])[0])
+            internals[k]["ACCpHp"] = np.degrees(
+                vec_angles(coord_array[0]-coord_array[1], coord_array[2]-coord_array[1])[0])
+            internals[k]["DOCCpH"] = np.degrees(
+                pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[3]))
+            internals[k]["DOCCpHp"] = np.degrees(
+                pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[2]))
         return internals
 
-    def get_Gmatrix(self):
+    def get_Gmatrix(self, kind=None):
         from TorTorGmatrix import TorTorGmatrix
         GmatObj = TorTorGmatrix(self)
-        Gmat = GmatObj.diagGmatrix
-        return Gmat
+        if kind == "diag":
+            GHdpHdp, GXX = GmatObj.diagGmatrix
+            GXHdp = None
+        elif kind == "full":
+            GHdpHdp, GXX, GXHdp = GmatObj.fullGmatrix
+        else:
+            raise Exception(f"can not solve {kind} type G-Matrix")
+        return GHdpHdp, GXX, GXHdp
+
+    def TwoDTorTor_constG(self):
+        """Runs 2D DVR over the original 2D potential"""
+        from Converter import Constants
+        dvr_2D = DVR("ColbertMillerND")
+        npz_filename = os.path.join(self.MoleculeDir, "ConstG_2D_DVR.npz")  # PICK UP HERE !!!!
+        twoD_grid = self.logData.rawenergies
+        xy = Constants.convert(twoD_grid[:, :2], "angstroms", to_AU=True)
+        en = twoD_grid[:, 2]
+        en[en > 0.228] = 0.228  # set stricter limit
+        res = dvr_2D.run(potential_grid=np.column_stack((xy, twoD_grid[:, 2])),
+                         divs=(100, 100), mass=[gmat, gmat], num_wfns=15,
+                         domain=((min(xy[:, 0]),  max(xy[:, 0])), (min(xy[:, 1]), max(xy[:, 1]))),
+                         results_class=ResultsInterpreter)
+        dvr_grid = Constants.convert(res.grid, "angstroms", to_AU=False)
+        dvr_pot = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
+        all_ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
+        ens = ...
+        wfns = ...
+        np.savez(npz_filename, grid=[dvr_grid], potential=[dvr_pot], vrwfn_idx=[0, oh1oo0, oh1oo1, oh1oo2],
+                 energy_array=ens, wfns_array=wfns)
+        return npz_filename
 
     def plot_Surfaces(self, xcoord, ycoord, zcoord=None, title=None):
         import matplotlib.pyplot as plt
@@ -171,7 +211,6 @@ class MoleculeInfo2D:
         fig = plt.figure()
         if zcoord is None:
             plt.plot(xcoord, ycoord, "o")
-
             plt.show()
         else:
             ax = plt.axes(projection='3d')
