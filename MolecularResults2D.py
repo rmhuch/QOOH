@@ -23,6 +23,7 @@ class MoleculeInfo2D:
         self._TorScanDict = None
         self._cartesians = None
         self._GmatCoords = None
+        self._Gmatrix = None
         self._DipoleMomentSurface = None
 
     @property
@@ -69,6 +70,12 @@ class MoleculeInfo2D:
         if self._GmatCoords is None:
             self._GmatCoords = self.get_GmatCoords()
         return self._GmatCoords
+
+    @property
+    def Gmatrix(self):
+        if self._Gmatrix is None:
+            self._Gmatrix = self.get_Gmatrix()
+        return self._Gmatrix
 
     @property
     def DipoleMomentSurface(self):
@@ -118,13 +125,25 @@ class MoleculeInfo2D:
         HOOC = np.round(HOOC)
         OCCH = np.round(OCCH)
         OCCHp = np.round(OCCHp)
-        OCCX = (OCCH + OCCHp)/2
+        # OCCHP = OCCHp + 180
+        OCCX = ((OCCH + OCCHp)/2) + 90
         round_OCCX = np.round(OCCX/10)*10
         HOOC = [x + 360 if x < 0 else x for x in HOOC]
-        round_OCCX = [x + 180 if x < 0 else x for x in round_OCCX]
         groupie = Grouper(all_coords, np.array((HOOC, round_OCCX)).T)
         all_carts = groupie.group_dict
         finalCarts = {k: v[-1] for k, v in all_carts.items()}
+        for t1, t2 in list(finalCarts.keys()):
+            if t2 == 0:
+                finalCarts[(t1, 180)] = finalCarts[(t1, 0)]
+            elif t2 == 180:
+                finalCarts[(t1, 0)] = finalCarts[(t1, 180)]
+            else:
+                pass
+        for t1, t2 in list(finalCarts.keys()):
+            if t1 == 0:
+                finalCarts[(360, t2)] = finalCarts[(0, t2)]
+            else:
+                pass
         return finalCarts
 
     def get_GmatCoords(self):
@@ -139,6 +158,12 @@ class MoleculeInfo2D:
             internals[k]["DOCCpH"] = np.degrees(pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[3]))
             internals[k]["DOCCpHp"] = np.degrees(pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[2]))
         return internals
+
+    def get_Gmatrix(self):
+        from TorTorGmatrix import TorTorGmatrix
+        GmatObj = TorTorGmatrix(self)
+        Gmat = GmatObj.diagGmatrix
+        return Gmat
 
     def plot_Surfaces(self, xcoord, ycoord, zcoord=None, title=None):
         import matplotlib.pyplot as plt
