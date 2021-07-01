@@ -24,8 +24,6 @@ class MoleculeInfo2D:
         self._TorScanDict = None
         self._cartesians = None
         self._GmatCoords = None
-        self._diagGmatrix = None
-        self._fullGmatrix = None
         self._DipoleMomentSurface = None
 
     @property
@@ -72,18 +70,6 @@ class MoleculeInfo2D:
         if self._GmatCoords is None:
             self._GmatCoords = self.get_GmatCoords()
         return self._GmatCoords
-
-    @property
-    def diagGmatrix(self):
-        if self._diagGmatrix is None:
-            self._diagGmatrix = self.get_Gmatrix(kind="diag")
-        return self._diagGmatrix
-
-    @property
-    def fullGmatrix(self):
-        if self._fullGmatrix is None:
-            self._fullGmatrix = self.get_Gmatrix(kind="full")
-        return self._fullGmatrix
 
     @property
     def DipoleMomentSurface(self):
@@ -171,37 +157,48 @@ class MoleculeInfo2D:
                 pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[2]))
         return internals
 
-    def get_Gmatrix(self, kind=None):
+
+class MolecularResults2D:
+    def __init__(self, MolObj, ):
         from TorTorGmatrix import TorTorGmatrix
-        GmatObj = TorTorGmatrix(self)
-        if kind == "diag":
-            GHdpHdp, GXX = GmatObj.diagGmatrix
-            GXHdp = None
-        elif kind == "full":
-            GHdpHdp, GXX, GXHdp = GmatObj.fullGmatrix
-        else:
-            raise Exception(f"can not solve {kind} type G-Matrix")
-        return GHdpHdp, GXX, GXHdp
+        self.MoleculeObj = MolObj
+        self.MoleculeDir = MolObj.MoleculeDir
+        self.GmatObj = TorTorGmatrix(self.MoleculeObj)
+        self.GHdpHdp = self.GmatObj.GHdpHdp
+        self._GXX = self.GmatObj.GXX
+        self._GXHdp = self.GmatObj.GXHdp
+        # pick up here! need to pull change of g-mat naming through, it is tuple (val_mat, func)
+
 
     def TwoDTorTor_constG(self):
         """Runs 2D DVR over the original 2D potential"""
         from Converter import Constants
+        from McUtils.Plots import ContourPlot
         dvr_2D = DVR("ColbertMillerND")
-        npz_filename = os.path.join(self.MoleculeDir, "ConstG_2D_DVR.npz")  # PICK UP HERE !!!!
-        twoD_grid = self.logData.rawenergies
-        xy = Constants.convert(twoD_grid[:, :2], "angstroms", to_AU=True)
-        en = twoD_grid[:, 2]
-        en[en > 0.228] = 0.228  # set stricter limit
-        res = dvr_2D.run(potential_grid=np.column_stack((xy, twoD_grid[:, 2])),
-                         divs=(100, 100), mass=[gmat, gmat], num_wfns=15,
-                         domain=((min(xy[:, 0]),  max(xy[:, 0])), (min(xy[:, 1]), max(xy[:, 1]))),
+        npz_filename = os.path.join(self.MoleculeDir, "ConstG_2D_DVR.npz")
+        twoD_dat = np.column_stack((np.radians(self.MoleculeObj.TORScanData["D4"]), np.radians(self.MoleculeObj.TORScanData["D2"]),
+                                    (self.MoleculeObj.TORScanData["Energy"]-min(self.MoleculeObj.TORScanData["Energy"]))))
+        twoD_dat_again = np.concatenate([twoD_dat, twoD_dat + np.array([[0, np.pi, 0]])], axis=0)
+        # this duplicates the OCCX data so that it is on (0, 2pi) instead of (0, pi)
+        sort_ind = np.lexsort((twoD_dat_again[:, 1], twoD_dat_again[:, 0]))
+        twoD_grid = twoD_dat_again[sort_ind]
+        gHdpHdp = self.diagGmatrix[0][26, 15]
+        gXX = self.diagGmatrix[1][26, 15]
+        res = dvr_2D.run(potential_grid=twoD_grid, flavor="[0,2Pi]",
+                         divs=(101, 101), mass=[1/(2*gHdpHdp), 1/(2*gXX)], num_wfns=15,
+                         domain=((min(twoD_grid[:, 0]),  max(twoD_grid[:, 0])),
+                                 (min(twoD_grid[:, 1]), max(twoD_grid[:, 1]))),
                          results_class=ResultsInterpreter)
         dvr_grid = Constants.convert(res.grid, "angstroms", to_AU=False)
         dvr_pot = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
+        # res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
+        #                    plot_style=dict(levels=15)).show()
         all_ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
+        # print(ResultsInterpreter.pull_energies(res)[:10])
+        ResultsInterpreter.wfn_contours(res)
         ens = ...
         wfns = ...
-        np.savez(npz_filename, grid=[dvr_grid], potential=[dvr_pot], vrwfn_idx=[0, oh1oo0, oh1oo1, oh1oo2],
+        np.savez(npz_filename, grid=[dvr_grid], potential=[dvr_pot],
                  energy_array=ens, wfns_array=wfns)
         return npz_filename
 

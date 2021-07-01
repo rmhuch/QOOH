@@ -10,8 +10,9 @@ qooh = MoleculeInfo2D(MoleculeName="QOOH",
                       oh_scan_npz="QOOH_OH_2d_energies_internals.npz",
                       tor_scan_npz="QOOH_2d_energies_internals.npz",
                       cartesians_npz="QOOH_2d_cartesians.npz")
+qooh_2Dres = MolecularResults2D(MolObj=qooh)
 
-test = qooh.diagGmatrix
+test = qooh_2Dres.TwoDTorTor_constG()
 # HOOC = qooh.TORScanData["D4"]
 # CH2 = qooh.TORScanData["D2"]
 # energies = qooh.TORScanData["Energy"]
