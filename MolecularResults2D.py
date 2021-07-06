@@ -119,7 +119,6 @@ class MoleculeInfo2D:
         HOOC = np.round(HOOC)
         OCCH = np.round(OCCH)
         OCCHp = np.round(OCCHp)
-        # OCCHP = OCCHp + 180
         OCCX = ((OCCH + OCCHp)/2) + 90
         round_OCCX = np.round(OCCX/10)*10
         HOOC = [x + 360 if x < 0 else x for x in HOOC]
@@ -165,41 +164,89 @@ class MolecularResults2D:
         self.MoleculeDir = MolObj.MoleculeDir
         self.GmatObj = TorTorGmatrix(self.MoleculeObj)
         self.GHdpHdp = self.GmatObj.GHdpHdp
-        self._GXX = self.GmatObj.GXX
-        self._GXHdp = self.GmatObj.GXHdp
-        # pick up here! need to pull change of g-mat naming through, it is tuple (val_mat, func)
+        self.GXX = self.GmatObj.GXX
+        self.GXHdp = self.GmatObj.GXHdp
+        self._Gderiv_XX = None
+        self._Gderiv_HdpHdp = None
+        self._squareCoords = None
 
+    @property
+    def Gderiv_XX(self):
+        if self._Gderiv_XX is None:
+            def getGXX_deriv(coords):
+                return self.GXX[1](coords, dx=0, dy=2)
+            self._Gderiv_XX = getGXX_deriv
+        return self._Gderiv_XX
+
+    @property
+    def Gderiv_HdpHdp(self):
+        if self._Gderiv_HdpHdp is None:
+            def getGHdpHdp_deriv(coords):
+                return self.GHdpHdp[1](coords, dx=2, dy=0)
+            self._Gderiv_HdpHdp = getGHdpHdp_deriv
+        return self._Gderiv_HdpHdp
+
+    @property
+    def squareCoords(self):
+        """ this duplicates the OCCX data so that it is on (0, 2pi) instead of (0, pi)
+         ULTIMATELY THE DIPOLE MOMENT WILL NEED TO BE INCORPORATED HERE"""
+        if self._squareCoords is None:
+            twoD_dat = np.column_stack(
+                (np.radians(self.MoleculeObj.TORScanData["D4"]), np.radians(self.MoleculeObj.TORScanData["D2"]),
+                 (self.MoleculeObj.TORScanData["Energy"] - min(self.MoleculeObj.TORScanData["Energy"]))))
+            twoD_mirror = np.column_stack((twoD_dat[:, 0], 2*np.pi - twoD_dat[:, 1], twoD_dat[:, 2]))
+            twoD_dat_again = np.concatenate([twoD_dat, twoD_mirror], axis=0)
+            sort_ind = np.lexsort((twoD_dat_again[:, 1], twoD_dat_again[:, 0]))
+            self._squareCoords = twoD_dat_again[sort_ind]
+        return self._squareCoords
 
     def TwoDTorTor_constG(self):
         """Runs 2D DVR over the original 2D potential"""
         from Converter import Constants
         from McUtils.Plots import ContourPlot
         dvr_2D = DVR("ColbertMillerND")
+        print("Conducting 2D DVR with Constant G")
         npz_filename = os.path.join(self.MoleculeDir, "ConstG_2D_DVR.npz")
-        twoD_dat = np.column_stack((np.radians(self.MoleculeObj.TORScanData["D4"]), np.radians(self.MoleculeObj.TORScanData["D2"]),
-                                    (self.MoleculeObj.TORScanData["Energy"]-min(self.MoleculeObj.TORScanData["Energy"]))))
-        twoD_dat_again = np.concatenate([twoD_dat, twoD_dat + np.array([[0, np.pi, 0]])], axis=0)
-        # this duplicates the OCCX data so that it is on (0, 2pi) instead of (0, pi)
-        sort_ind = np.lexsort((twoD_dat_again[:, 1], twoD_dat_again[:, 0]))
-        twoD_grid = twoD_dat_again[sort_ind]
-        gHdpHdp = self.diagGmatrix[0][26, 15]
-        gXX = self.diagGmatrix[1][26, 15]
-        res = dvr_2D.run(potential_grid=twoD_grid, flavor="[0,2Pi]",
-                         divs=(101, 101), mass=[1/(2*gHdpHdp), 1/(2*gXX)], num_wfns=15,
-                         domain=((min(twoD_grid[:, 0]),  max(twoD_grid[:, 0])),
-                                 (min(twoD_grid[:, 1]), max(twoD_grid[:, 1]))),
+        gHdpHdp = self.GHdpHdp[0][26, 15]  # calls the calculate g-mat element at the equilibrium geom
+        gXX = self.GXX[0][26, 15]
+        res = dvr_2D.run(potential_grid=self.squareCoords, flavor="[0,2Pi]",
+                         divs=(125, 125), mass=[1/gHdpHdp, 1/gXX], num_wfns=25,
+                         domain=((min(self.squareCoords[:, 0]),  max(self.squareCoords[:, 0])),
+                                 (min(self.squareCoords[:, 1]), max(self.squareCoords[:, 1]))),
                          results_class=ResultsInterpreter)
         dvr_grid = Constants.convert(res.grid, "angstroms", to_AU=False)
         dvr_pot = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
-        # res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
-        #                    plot_style=dict(levels=15)).show()
+        res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
+                           plot_style=dict(levels=15)).show()
         all_ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
-        # print(ResultsInterpreter.pull_energies(res)[:10])
+        print(ResultsInterpreter.pull_energies(res))
         ResultsInterpreter.wfn_contours(res)
-        ens = ...
-        wfns = ...
-        np.savez(npz_filename, grid=[dvr_grid], potential=[dvr_pot],
-                 energy_array=ens, wfns_array=wfns)
+        # np.savez(npz_filename, grid=[dvr_grid], potential=[dvr_pot],
+        #          energy_array=ens, wfns_array=wfns)
+        return npz_filename
+
+    def TwoDTorTor_diagG(self):
+        """Runs 2D DVR over the original 2D potential"""
+        from Converter import Constants
+        from McUtils.Plots import ContourPlot
+        dvr_2D = DVR("ColbertMillerND")
+        print("Conducting 2D DVR with Diagonal G")
+        npz_filename = os.path.join(self.MoleculeDir, "ConstG_2D_DVR.npz")
+        res = dvr_2D.run(potential_grid=self.squareCoords, flavor="[0,2Pi]",
+                         divs=(125, 125), g=[[self.GHdpHdp[1], 0], [0, self.GXX[1]]],
+                         g_deriv=[self.Gderiv_HdpHdp, self.Gderiv_XX], num_wfns=25,
+                         domain=((min(self.squareCoords[:, 0]),  max(self.squareCoords[:, 0])),
+                                 (min(self.squareCoords[:, 1]), max(self.squareCoords[:, 1]))),
+                         results_class=ResultsInterpreter)
+        dvr_grid = Constants.convert(res.grid, "angstroms", to_AU=False)
+        dvr_pot = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
+        res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
+                           plot_style=dict(levels=15)).show()
+        all_ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
+        print(ResultsInterpreter.pull_energies(res))
+        ResultsInterpreter.wfn_contours(res)
+        # np.savez(npz_filename, grid=[dvr_grid], potential=[dvr_pot],
+        #          energy_array=ens, wfns_array=wfns)
         return npz_filename
 
     def plot_Surfaces(self, xcoord, ycoord, zcoord=None, title=None):
@@ -223,4 +270,3 @@ class MolecularResults2D:
             ax.axes.set_yticks(np.arange(0, 240, 60))
             ax.set_zlabel("Electronic Energy")
             plt.title(title)
-            plt.show()
