@@ -194,10 +194,11 @@ class MolecularResults2D:
             twoD_dat = np.column_stack(
                 (np.radians(self.MoleculeObj.TORScanData["D4"]), np.radians(self.MoleculeObj.TORScanData["D2"]),
                  (self.MoleculeObj.TORScanData["Energy"] - min(self.MoleculeObj.TORScanData["Energy"]))))
-            twoD_mirror = np.column_stack((twoD_dat[:, 0], 2*np.pi - twoD_dat[:, 1], twoD_dat[:, 2]))
-            twoD_dat_again = np.concatenate([twoD_dat, twoD_mirror], axis=0)
+            twoD_dat_again = np.concatenate([twoD_dat, twoD_dat + np.array([[0, np.pi, 0]])], axis=0)
+            # this duplicates the OCCX data so that it is on (0, 2pi) instead of (0, pi)
             sort_ind = np.lexsort((twoD_dat_again[:, 1], twoD_dat_again[:, 0]))
-            self._squareCoords = twoD_dat_again[sort_ind]
+            twoD_grid = twoD_dat_again[sort_ind]
+            self._squareCoords = twoD_grid
         return self._squareCoords
 
     def TwoDTorTor_constG(self):
@@ -240,8 +241,8 @@ class MolecularResults2D:
                          results_class=ResultsInterpreter)
         dvr_grid = Constants.convert(res.grid, "angstroms", to_AU=False)
         dvr_pot = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
-        res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
-                           plot_style=dict(levels=15)).show()
+        # res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
+        #                    plot_style=dict(levels=15)).show()
         all_ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
         print(ResultsInterpreter.pull_energies(res))
         ResultsInterpreter.wfn_contours(res)
