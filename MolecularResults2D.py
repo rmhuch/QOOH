@@ -150,6 +150,8 @@ class MoleculeInfo2D:
                 vec_angles(coord_array[0]-coord_array[1], coord_array[3]-coord_array[1])[0])
             internals[k]["ACCpHp"] = np.degrees(
                 vec_angles(coord_array[0]-coord_array[1], coord_array[2]-coord_array[1])[0])
+            internals[k]["AOCCp"] = np.degrees(
+                vec_angles(coord_array[4]-coord_array[0], coord_array[1]-coord_array[0])[0])
             internals[k]["DOCCpH"] = np.degrees(
                 pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[3]))
             internals[k]["DOCCpHp"] = np.degrees(

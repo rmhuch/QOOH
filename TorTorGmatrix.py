@@ -52,7 +52,7 @@ class TorTorGmatrix:
         """uses g_tau,tau (1234, 2156) from Frederick and Woywod J.Chem.Phys., doi: 140.254.87.101
         mass_array = mass [1, 2]"""
         lambda_123 = (1 / np.sin(ic["phi123"])) * (1 / ic["r12"] - (np.cos(ic["phi123"]) / ic["r23"]))
-        lambda_215 = (1 / np.sin(ic["phi234"])) * (1 / ic["r34"] - (np.cos(ic["phi234"]) / ic["r23"]))
+        lambda_215 = (1 / np.sin(ic["phi215"])) * (1 / ic["r12"] - (np.cos(ic["phi215"]) / ic["r15"]))
         Gab = (1 / (masses[0] * ic["r12"] * np.sin(ic["phi123"]))) * (
                     lambda_215 * np.cos(ic["tau3215"]) - ((1 / ic["r15"]) * (1 / np.tan(ic["phi156"]))) * (
                                 np.cos(ic["tau3215"]) * np.cos(ic["tau2156"]) +
@@ -64,7 +64,8 @@ class TorTorGmatrix:
         return Gab
 
     def calc_Gbc(self, masses, ic):
-        """uses g_tau,tau (1234, 1235) from Frederick and Woywod J.Chem.Phys., doi: 140.254.87.101"""
+        """uses g_tau,tau (1234, 1235) from Frederick and Woywod J.Chem.Phys., doi: 140.254.87.101
+           mass_array = mass [1, 2, 3, 4, 5]"""
         lambda_123 = (1 / np.sin(ic["phi123"])) * (1 / ic["r12"] - (np.cos(ic["phi123"]) / ic["r23"]))
         lambda_432 = (1 / np.sin(ic["phi234"])) * (1 / ic["r34"] - (np.cos(ic["phi234"]) / ic["r23"]))
         lambda_532 = (1 / np.sin(ic["phi235"])) * (1 / ic["r35"] - (np.cos(ic["phi235"]) / ic["r23"]))
@@ -195,18 +196,51 @@ class TorTorGmatrix:
 
     def calc_GHHdp(self):
         GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
-        ...
+        masses = [self.massarray[0], self.massarray[4]]  # only pass masses of atoms 1 & 2
+        for k, v in self.GmatCoords.items():
+            HOOC = k[0]
+            OCCX = k[1]
+            tor1_ind = np.where(self.tor1key == HOOC)[0][0]
+            tor2_ind = np.where(self.tor2key == OCCX)[0][0]
+            ic = {'r12': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B4"], "angstroms", to_AU=True),
+                  'r23': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B5"], "angstroms", to_AU=True),
+                  'r15': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B1"], "angstroms", to_AU=True),
+                  'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
+                  'phi215': np.radians(self.GmatCoords[(HOOC, OCCX)]["AOCCp"]),
+                  'phi156': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpH"]),
+                  'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A5"]),
+                  'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"]),
+                  'tau2156': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"]),
+                  'tau3215': np.radians(self.GmatCoords[(HOOC, OCCX)]["D3"])}
+            GHH[tor1_ind, tor2_ind] = self.calc_Gab(masses, ic)
         return GHH
 
     def calc_GHpHdp(self):
         GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
-        ...
+        masses = [self.massarray[0], self.massarray[4]]  # only pass masses of atoms 1 & 2
+        for k, v in self.GmatCoords.items():
+            HOOC = k[0]
+            OCCX = k[1]
+            tor1_ind = np.where(self.tor1key == HOOC)[0][0]
+            tor2_ind = np.where(self.tor2key == OCCX)[0][0]
+            ic = {'r12': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B4"], "angstroms", to_AU=True),
+                  'r23': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B5"], "angstroms", to_AU=True),
+                  'r15': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B1"], "angstroms", to_AU=True),
+                  'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
+                  'phi215': np.radians(self.GmatCoords[(HOOC, OCCX)]["AOCCp"]),
+                  'phi156': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpHp"]),
+                  'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A5"]),
+                  'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"]),
+                  'tau2156': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"]),
+                  'tau3215': np.radians(self.GmatCoords[(HOOC, OCCX)]["D3"])}
+            GHH[tor1_ind, tor2_ind] = self.calc_Gab(masses, ic)
         return GHH
 
     def calc_GXHdp(self):
-        """calculate the cross term for the G-matrix (OCCX with HOOC)"""
+        """calculate the cross term for the G-matrix (OCCX with HOOC) (off diagonal)"""
         GXHdp = (1/2) * (self.calc_GHHdp() + self.calc_GHpHdp())
-        GXHdp_func = interpolate.interp2d(self.tor1key, self.tor2key, GXHdp.T, kind="cubic")  # interp2d expects (y,x) matrix
+        GXHdp_func = interpolate.interp2d(self.tor1key, self.tor2key, GXHdp.T, kind="cubic")
+        # interp2d expects (y,x) matrix
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])
