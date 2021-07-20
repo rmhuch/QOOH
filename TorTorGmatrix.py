@@ -53,14 +53,15 @@ class TorTorGmatrix:
         mass_array = mass [1, 2]"""
         lambda_123 = (1 / np.sin(ic["phi123"])) * (1 / ic["r12"] - (np.cos(ic["phi123"]) / ic["r23"]))
         lambda_215 = (1 / np.sin(ic["phi215"])) * (1 / ic["r12"] - (np.cos(ic["phi215"]) / ic["r15"]))
-        Gab = (1 / (masses[0] * ic["r12"] * np.sin(ic["phi123"]))) * (
+        term1 = (1 / (masses[0] * ic["r12"] * np.sin(ic["phi123"]))) * (
                     lambda_215 * np.cos(ic["tau3215"]) - ((1 / ic["r15"]) * (1 / np.tan(ic["phi156"]))) * (
                                 np.cos(ic["tau3215"]) * np.cos(ic["tau2156"]) +
-                                np.cos(ic["phi215"]) * np.sin(ic["tau3215"]) * np.sin(ic["tau2156"]))) + \
-              (1 / masses[1] * ic["r12"] * np.sin(ic["phi215"])) * (
+                                np.cos(ic["phi215"]) * np.sin(ic["tau3215"]) * np.sin(ic["tau2156"])))
+        term2 = (1 / (masses[1] * ic["r12"] * np.sin(ic["phi215"]))) * (
                       lambda_123 * np.cos(ic["tau3215"]) - ((1 / ic["r23"]) * (1 / np.tan(ic["phi234"]))) * (
                                 np.cos(ic["tau3215"]) * np.cos(ic["tau1234"]) +
                                 np.cos(ic["phi123"]) * np.sin(ic["tau3215"]) * np.sin(ic["tau1234"])))
+        Gab = term1 + term2
         return Gab
 
     def calc_Gbc(self, masses, ic):
@@ -148,8 +149,6 @@ class TorTorGmatrix:
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
-            # if k == (260, 150):
-            #     print("GHH", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GHpH(self):
@@ -183,8 +182,6 @@ class TorTorGmatrix:
         for i in range(len(self.tor1key)):
             for j in range(len(self.tor2key)):
                 GXX[i, -(j+1)] = GXX[i, j]
-        # plt.matshow(GXX)
-        # plt.show()
         GXX_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
                                         GXX.T, kind="cubic")  # interp2d expects (y,x) matrix
 
@@ -195,7 +192,7 @@ class TorTorGmatrix:
         return GXX, caller
 
     def calc_GHHdp(self):
-        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
+        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
         masses = [self.massarray[0], self.massarray[4]]  # only pass masses of atoms 1 & 2
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -205,18 +202,20 @@ class TorTorGmatrix:
             ic = {'r12': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B4"], "angstroms", to_AU=True),
                   'r23': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B5"], "angstroms", to_AU=True),
                   'r15': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B1"], "angstroms", to_AU=True),
-                  'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
-                  'phi215': np.radians(self.GmatCoords[(HOOC, OCCX)]["AOCCp"]),
+                  'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A4"]),
+                  'phi215': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
                   'phi156': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpH"]),
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A5"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"]),
                   'tau2156': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"]),
                   'tau3215': np.radians(self.GmatCoords[(HOOC, OCCX)]["D3"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gab(masses, ic)
+            if k == (160, 150):
+                print("GHHdp", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GHpHdp(self):
-        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
+        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
         masses = [self.massarray[0], self.massarray[4]]  # only pass masses of atoms 1 & 2
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -226,20 +225,27 @@ class TorTorGmatrix:
             ic = {'r12': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B4"], "angstroms", to_AU=True),
                   'r23': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B5"], "angstroms", to_AU=True),
                   'r15': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B1"], "angstroms", to_AU=True),
-                  'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
-                  'phi215': np.radians(self.GmatCoords[(HOOC, OCCX)]["AOCCp"]),
+                  'phi123': np.radians(self.GmatCoords[(HOOC, OCCX)]["A4"]),
+                  'phi215': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
                   'phi156': np.radians(self.GmatCoords[(HOOC, OCCX)]["ACCpHp"]),
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A5"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"]),
                   'tau2156': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"]),
                   'tau3215': np.radians(self.GmatCoords[(HOOC, OCCX)]["D3"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gab(masses, ic)
+            if k == (160, 150):
+                print("GHpHdp", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GXHdp(self):
         """calculate the cross term for the G-matrix (OCCX with HOOC) (off diagonal)"""
         GXHdp = (1/2) * (self.calc_GHHdp() + self.calc_GHpHdp())
-        GXHdp_func = interpolate.interp2d(self.tor1key, self.tor2key, GXHdp.T, kind="cubic")
+        for i in range(len(self.tor1key)):
+            for j in range(len(self.tor2key)):
+                GXHdp[i, -(j+1)] = GXHdp[i, j]
+        print("GXH", GXHdp[16, 15])
+        GXHdp_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
+                                          GXHdp.T, kind="cubic")
         # interp2d expects (y,x) matrix
 
         def caller(coords, **deriv_kwargs):

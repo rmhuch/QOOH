@@ -10,12 +10,18 @@ qooh = MoleculeInfo2D(MoleculeName="QOOH",
                       oh_scan_npz="QOOH_OH_2d_energies_internals.npz",
                       tor_scan_npz="QOOH_2d_energies_internals.npz",
                       cartesians_npz="QOOH_2d_cartesians.npz")
-qooh_2Dres = MolecularResults2D(MolObj=qooh)
+qooh_2Dres = MolecularResults2D(MolObj=qooh,
+                                DVRparams={"desired_energies": 4,
+                                           "num_pts": 1000,
+                                           "plot_phased_wfns": False,
+                                            "extrapolate": 0})
 
-# test1 = qooh_2Dres.TwoDTorTor_constG()
-test = qooh_2Dres.TwoDTorTor_diagG()
+test1 = qooh_2Dres.GXHdp
+# test = qooh_2Dres.TwoDTorTor_FullG()
 # HOOC = qooh.TORScanData["D4"]
 # CH2 = qooh.TORScanData["D2"]
+# OH = qooh.TORScanData["B6"]
 # energies = qooh.TORScanData["Energy"]
 # en_cut = energies - min(energies)
-# qooh.plot_Surfaces(HOOC, CH2, zcoord=Constants.convert(en_cut, "wavenumbers", to_AU=False))
+# qooh_2Dres.plot_Surfaces(HOOC, CH2, zcoord=OH)
+# plt.show()
