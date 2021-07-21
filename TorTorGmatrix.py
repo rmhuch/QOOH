@@ -100,8 +100,6 @@ class TorTorGmatrix:
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"])}
             Ghh[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
             Ghh[tor1_ind, -(tor2_ind+1)] = Ghh[tor1_ind, tor2_ind]
-        # plt.matshow(Ghh)
-        # plt.show()
         Ghh_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
                                         Ghh.T, kind="cubic")  # interp2d expects (y,x) matrix
 
@@ -128,8 +126,6 @@ class TorTorGmatrix:
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A3"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
-            # if k == (260, 150):
-            #     print("GHpHp", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GHH(self):
@@ -171,12 +167,9 @@ class TorTorGmatrix:
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"]),
                   'tau1235': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gbc(masses, ic)
-            # if k == (260, 150):
-            #     print("GHpH", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GXX(self):
-        import matplotlib.pyplot as plt
         """calculate the G-matrix of the OCCX torsion"""
         GXX = (1/4) * (self.calc_GHH() + self.calc_GHpHp() + self.calc_GHpH())
         for i in range(len(self.tor1key)):
@@ -210,8 +203,6 @@ class TorTorGmatrix:
                   'tau2156': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpH"]),
                   'tau3215': np.radians(self.GmatCoords[(HOOC, OCCX)]["D3"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gab(masses, ic)
-            if k == (160, 150):
-                print("GHHdp", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GHpHdp(self):
@@ -233,8 +224,6 @@ class TorTorGmatrix:
                   'tau2156': np.radians(self.GmatCoords[(HOOC, OCCX)]["DOCCpHp"]),
                   'tau3215': np.radians(self.GmatCoords[(HOOC, OCCX)]["D3"])}
             GHH[tor1_ind, tor2_ind] = self.calc_Gab(masses, ic)
-            if k == (160, 150):
-                print("GHpHdp", GHH[tor1_ind, tor2_ind])
         return GHH
 
     def calc_GXHdp(self):
@@ -243,7 +232,6 @@ class TorTorGmatrix:
         for i in range(len(self.tor1key)):
             for j in range(len(self.tor2key)):
                 GXHdp[i, -(j+1)] = GXHdp[i, j]
-        print("GXH", GXHdp[16, 15])
         GXHdp_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
                                           GXHdp.T, kind="cubic")
         # interp2d expects (y,x) matrix
