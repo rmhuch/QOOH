@@ -9,16 +9,17 @@ qooh = MoleculeInfo2D(MoleculeName="QOOH",
                       eqTORangle=[113.65694, 261.13745],
                       oh_scan_npz="QOOH_OH_2d_energies_internals.npz",
                       tor_scan_npz="QOOH_2d_energies_internals.npz",
-                      cartesians_npz="QOOH_2d_cartesians.npz")
-qooh_2Dres = MolecularResults2D(MolObj=qooh,
-                                DVRparams={"desired_energies": 4,
-                                           "num_pts": 1000,
-                                           "plot_phased_wfns": False,
-                                            "extrapolate": 0},
-                                TransitionStr=["0->1", "0->2"])
+                      cartesians_npz="QOOH_2d_cartesians.npz",
+                      dipole_npz="rotated_dipoles_coords_qooh_3d.npz")
+# qooh_2Dres = MolecularResults2D(MolObj=qooh,
+#                                 DVRparams={"desired_energies": 4,
+#                                            "num_pts": 1000,
+#                                            "plot_phased_wfns": False,
+#                                             "extrapolate": 0},
+#                                 TransitionStr=["0->1", "0->2"])
 
-# test1 = qooh_2Dres.GXHdp
-test = qooh_2Dres.TwoD_transitions()
+test1 = qooh.plot_DipoleSurface()
+# test = qooh_2Dres.TwoDdvrRes
 # HOOC = qooh.TORScanData["D4"]
 # CH2 = qooh.TORScanData["D2"]
 # OH = qooh.TORScanData["B6"]

@@ -175,6 +175,7 @@ class TorTorGmatrix:
         for i in range(len(self.tor1key)):
             for j in range(len(self.tor2key)):
                 GXX[i, -(j+1)] = GXX[i, j]
+        np.save("2D_GXX.npy", GXX)
         GXX_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
                                         GXX.T, kind="cubic")  # interp2d expects (y,x) matrix
 

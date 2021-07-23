@@ -45,8 +45,8 @@ class TransitionMoments2D:
         # EDIT (?!?!?!)
         """Interpolate dipole moment and wavefunction to be the same length and range"""
         from scipy import interpolate
-        wavefuns = self.DVRresults["wavefunctions"]
-        pot = self.DVRresults["potential"]
+        wavefuns = self.OHresults["wavefunctions"]
+        pot = self.OHresults["potential"]
         tor_degrees = np.arange(0, 370, 10).astype(int)
 
         pot_bohr = Constants.convert(pot[:, :, 0], "angstroms", to_AU=True)  # convert to bohr

@@ -75,7 +75,7 @@ class MoleculeInfo2D:
     @property
     def DipoleMomentSurface(self):
         if self._DipoleMomentSurface is None:
-            self._DipoleMomentSurface = np.load(os.path.join(self.MoleculeDir, self.dipole_npz))
+            self._DipoleMomentSurface = self.get_DipoleDict()
             # pulls in data as a dictionary that is keyed by angles, with values: (roh, x, y, z)
         return self._DipoleMomentSurface
 
@@ -120,11 +120,14 @@ class MoleculeInfo2D:
                 pts_dihedrals(coord_array[:, 4], coord_array[:, 0], coord_array[:, 1], coord_array[:, 2])))
             all_coords.extend(coord_array)
         HOOC = np.round(HOOC)
+        HOOC = [-x if x < 0 else 360 - x for x in HOOC]
         OCCH = np.round(OCCH)
+        OCCH = np.array([-x if x < 0 else 360 - x for x in OCCH])
         OCCHp = np.round(OCCHp)
-        OCCX = ((OCCH + OCCHp)/2) + 90
+        OCCHp = np.array([-x if x < 0 else 360 - x for x in OCCHp])
+        OCCX = ((OCCH + OCCHp)/2)
         round_OCCX = np.round(OCCX/10)*10
-        HOOC = [x + 360 if x < 0 else x for x in HOOC]
+
         groupie = Grouper(all_coords, np.array((HOOC, round_OCCX)).T)
         all_carts = groupie.group_dict
         finalCarts = {k: v[-1] for k, v in all_carts.items()}
@@ -161,6 +164,42 @@ class MoleculeInfo2D:
                 pts_dihedrals(coord_array[4], coord_array[0], coord_array[1], coord_array[2]))
         return internals
 
+    def get_DipoleDict(self):
+        dat = np.load(os.path.join(self.MoleculeDir, self.dipole_npz))
+        dipoleDict = dict()
+        for file in dat.files:
+            hooc_str, occx_str = file.split("_")
+            HOOC = int(hooc_str)
+            OCCX = int(occx_str)
+            dipoleDict[(HOOC, OCCX)] = dat[file][:, :4]
+            dipoleDict[(HOOC, (OCCX+180))] = dat[file][:, :4]
+        return dipoleDict
+
+    def plot_DipoleSurface(self, component="a"):
+        import matplotlib.pyplot as plt
+        unHOOC = np.unique([k[0] for k in self.DipoleMomentSurface.keys()])
+        unOCCX = np.unique([k[1] for k in self.DipoleMomentSurface.keys()])
+        XX, YY = np.meshgrid(unHOOC, unOCCX)
+        zz = np.zeros(XX.shape)
+        if component == "a":
+            component = 1
+        elif component == "b":
+            component = 2
+        elif component == "c":
+            component = 3
+        else:
+            raise Exception(f"No Dipole for {component} component.")
+        for i, j in enumerate(unHOOC):
+            for ip, jp in enumerate(unOCCX):
+                diff = self.DipoleMomentSurface[(j, jp)][:, 0] - 0.96
+                eq_ind = np.argmin(abs(diff))
+                if eq_ind != 6:
+                    raise Exception(f"({j}, {jp}) eq_ind = {eq_ind}")
+                # we assign in "switched" indices b.c. mesh grid is not "ij" indexed :angry_face:
+                zz[ip, i] = self.DipoleMomentSurface[(j, jp)][eq_ind, component]
+        plt.contourf(XX, YY, zz)
+        plt.colorbar()
+        plt.show()
 
 class MolecularResults2D:
     def __init__(self, MolObj, DVRparams, TransitionStr):
@@ -231,13 +270,13 @@ class MolecularResults2D:
             resDict = dict()
             for i, val in enumerate(['VOH_0', 'VOH_1', 'VOH_2', 'VOH_3']):
                 resultspath = os.path.join(self.MoleculeDir, f"FullG_2D_DVR_{val}.npz")
-                if os.path.exists(resultspath):
-                    print(f"Loading {resultspath}... ")
-                    resDict[val] = np.load(resultspath, allow_pickle=True)
-                else:
-                    print(f"Calculating {resultspath}... ")
-                    res = self.TwoDTorTor_FullG(val)
-                    resDict[val] = np.load(res, allow_pickle=True)
+                # if os.path.exists(resultspath):
+                #     print(f"Loading {resultspath}... ")
+                #     resDict[val] = np.load(resultspath, allow_pickle=True)
+                # else:
+                print(f"Calculating {resultspath}... ")
+                res = self.TwoDTorTor_FullG(val)
+                resDict[val] = np.load(res, allow_pickle=True)
         return resDict
 
     def plot_Surfaces(self, xcoord, ycoord, zcoord=None, title=None):
@@ -332,13 +371,13 @@ class MolecularResults2D:
         adiabat_pots = self.Adiabats
         # run for given adiabat, loop outside of this function
         npz_filename = os.path.join(self.MoleculeDir, f"FullG_2D_DVR_{val}.npz")
-        i = val[-1]
+        i = int(val[-1])
         potential = Epot2[:, 2] + adiabat_pots[:, 2+i]
         pot_vals = np.column_stack((np.radians(self.Adiabats[:, 0]), np.radians(self.Adiabats[:, 1]),
                                     potential))
         res = dvr_2D.run(potential_grid=pot_vals, flavor="[0,2Pi]",
                          divs=(51, 51), g=[[self.GHdpHdp[1], self.GXHdp[1]], [self.GXHdp[1], self.GXX[1]]],
-                         g_deriv=[self.Gderiv_HdpHdp, self.Gderiv_XX], num_wfns=25,
+                         g_deriv=[self.Gderiv_HdpHdp, self.Gderiv_XX], num_wfns=10,
                          domain=((min(pot_vals[:, 0]),  max(pot_vals[:, 0])),
                                  (min(pot_vals[:, 1]), max(pot_vals[:, 1]))),
                          results_class=ResultsInterpreter)
