@@ -64,7 +64,7 @@ def run_2D_OHDVR(data_dict, extrapolate=0, NumPts=1000, desiredEnergies=3, plotP
         else:
             x = Constants.convert(data_dict[n]["B6"], "angstroms", to_AU=True)
             en = data_dict[n]["Energy"] - np.min(data_dict[n]["Energy"])
-        # subtract minimum at each cut to eliminate the electronic component since we fit our adiabats without it.
+        # subtract minimum at each cut to eliminate the electronic component since we add later
         res = dvr_1D.run(potential_function=Potentials1D().potlint(x, en), mass=muOH,
                          divs=NumPts, domain=(min(x) - extrapolate, max(x) + extrapolate), num_wfns=desiredEnergies)
         potential = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
@@ -73,8 +73,8 @@ def run_2D_OHDVR(data_dict, extrapolate=0, NumPts=1000, desiredEnergies=3, plotP
         potential_array[j, :, 1] = potential
         energies_array[j, :] = res.wavefunctions.energies
         wavefunctions_array[j, :, :] = res.wavefunctions.wavefunctions
-    epsilon_pots = np.column_stack((degree_vals, energies_array[:, :desiredEnergies + 1]))
-    # data saved in HARTREES/degrees
+    epsilon_pots = np.column_stack((np.radians(degree_vals), energies_array[:, :desiredEnergies + 1]))
+    # data saved in radians/HARTREES
     wavefuns_array = wfn_flipper(wavefunctions_array, plotPhasedWfns=plotPhasedWfns, pot_array=potential_array)
     return potential_array, epsilon_pots, wavefuns_array
 

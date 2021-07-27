@@ -84,8 +84,7 @@ class TorTorGmatrix:
     def calc_GHdpHdp(self):
         """ calculates the HOOC torsion with HOOC torsion g-matrix element with H''-1, O-2, O-3, C-4 and returns
          the 2d interpolation of the g-matrix"""
-        import matplotlib.pyplot as plt
-        Ghh = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
+        Ghh = np.zeros((len(self.tor1key), len(self.tor2key)))
         masses = [self.massarray[6], self.massarray[5], self.massarray[4], self.massarray[0]]
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -99,9 +98,8 @@ class TorTorGmatrix:
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A4"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"])}
             Ghh[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
-            Ghh[tor1_ind, -(tor2_ind+1)] = Ghh[tor1_ind, tor2_ind]
-        Ghh_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
-                                        Ghh.T, kind="cubic")  # interp2d expects (y,x) matrix
+        Ghh_func = interpolate.interp2d(self.tor1key, self.tor2key, Ghh.T, kind="cubic")
+        # Transpose G because interp2d expects (y,x) matrix
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])
@@ -112,7 +110,7 @@ class TorTorGmatrix:
     def calc_GHpHp(self):
         """ calculates the OCC'H' torsion with OCC'H' torsion g-matrix element with H'-1, C'-2, C-3, O-4 and returns
          the 2d interpolation of the g-matrix"""
-        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
         masses = [self.massarray[2], self.massarray[1], self.massarray[0], self.massarray[4]]
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -131,13 +129,15 @@ class TorTorGmatrix:
     def calc_GHH(self):
         """ calculates the OCC'H torsion with OCC'H torsion g-matrix element with H-1, C'-2, C-3, O-4 and returns
          the 2d interpolation of the g-matrix"""
-        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
         masses = [self.massarray[3], self.massarray[1], self.massarray[0], self.massarray[4]]
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
             OCCX = k[1]
             tor1_ind = np.where(self.tor1key == HOOC)[0][0]
             tor2_ind = np.where(self.tor2key == OCCX)[0][0]
+            if "ACCpH" not in self.GmatCoords[(HOOC, OCCX)]:
+                raise Exception(f"No ACCpH in {(HOOC, OCCX)}")
             ic = {'r12': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B3"], "angstroms", to_AU=True),
                   'r23': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B1"], "angstroms", to_AU=True),
                   'r34': Constants.convert(self.GmatCoords[(HOOC, OCCX)]["B4"], "angstroms", to_AU=True),
@@ -150,7 +150,7 @@ class TorTorGmatrix:
     def calc_GHpH(self):
         """ calculates the OCC'H' torsion with OCC'H torsion g-matrix element with O-1, C-2, C'-3, H'-4, H-5 and returns
          the 2d interpolation of the g-matrix"""
-        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
         masses = [self.massarray[4], self.massarray[0], self.massarray[1], self.massarray[2], self.massarray[3]]
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -172,12 +172,8 @@ class TorTorGmatrix:
     def calc_GXX(self):
         """calculate the G-matrix of the OCCX torsion"""
         GXX = (1/4) * (self.calc_GHH() + self.calc_GHpHp() + self.calc_GHpH())
-        for i in range(len(self.tor1key)):
-            for j in range(len(self.tor2key)):
-                GXX[i, -(j+1)] = GXX[i, j]
-        np.save("2D_GXX.npy", GXX)
-        GXX_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
-                                        GXX.T, kind="cubic")  # interp2d expects (y,x) matrix
+        GXX_func = interpolate.interp2d(self.tor1key, self.tor2key, GXX.T, kind="cubic")
+        # Transpose G because interp2d expects (y,x) matrix
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])
@@ -186,7 +182,7 @@ class TorTorGmatrix:
         return GXX, caller
 
     def calc_GHHdp(self):
-        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
         masses = [self.massarray[0], self.massarray[4]]  # only pass masses of atoms 1 & 2
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -207,7 +203,7 @@ class TorTorGmatrix:
         return GHH
 
     def calc_GHpHdp(self):
-        GHH = np.zeros((len(self.tor1key), 2*len(self.tor2key)-1))
+        GHH = np.zeros((len(self.tor1key), len(self.tor2key)))
         masses = [self.massarray[0], self.massarray[4]]  # only pass masses of atoms 1 & 2
         for k, v in self.GmatCoords.items():
             HOOC = k[0]
@@ -230,12 +226,8 @@ class TorTorGmatrix:
     def calc_GXHdp(self):
         """calculate the cross term for the G-matrix (OCCX with HOOC) (off diagonal)"""
         GXHdp = (1/2) * (self.calc_GHHdp() + self.calc_GHpHdp())
-        for i in range(len(self.tor1key)):
-            for j in range(len(self.tor2key)):
-                GXHdp[i, -(j+1)] = GXHdp[i, j]
-        GXHdp_func = interpolate.interp2d(self.tor1key, np.concatenate([self.tor2key, (np.pi+self.tor2key[1:])]),
-                                          GXHdp.T, kind="cubic")
-        # interp2d expects (y,x) matrix
+        GXHdp_func = interpolate.interp2d(self.tor1key, self.tor2key, GXHdp.T, kind="cubic")
+        # Transpose G because interp2d expects (y,x) matrix
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])

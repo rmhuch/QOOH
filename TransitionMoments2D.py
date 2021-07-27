@@ -8,6 +8,7 @@ class TransitionMoments2D:
         self.OHresults = OH_res
         self.tortor_results = tortor_results
         self.MolecularInfo_obj = MolecularInfo_obj
+        self.DipoleMomentSurface = MolecularInfo_obj.DipoleMomentSurface
         self.transition = transition
         self.intensity_derivs = intensity_derivatives
         self._InterpedGDW = None
@@ -42,13 +43,11 @@ class TransitionMoments2D:
         return intensities  # ordered dict keyed by transition, holding a list of all the tor transitions
 
     def interpDW(self):
-        # EDIT (?!?!?!)
+        # Pick up here. Dupe handled, and all dat fixed, just need to start implementation.
         """Interpolate dipole moment and wavefunction to be the same length and range"""
         from scipy import interpolate
         wavefuns = self.OHresults["wavefunctions"]
         pot = self.OHresults["potential"]
-        tor_degrees = np.arange(0, 370, 10).astype(int)
-
         pot_bohr = Constants.convert(pot[:, :, 0], "angstroms", to_AU=True)  # convert to bohr
         grid_min = np.min(pot_bohr)
         grid_max = np.max(pot_bohr)
@@ -62,8 +61,7 @@ class TransitionMoments2D:
                                          kind="cubic", bounds_error=False, fill_value="extrapolate")
                 interp_wfns[i, :, s] = f(new_grid)
             for c in np.arange(3):  # loop through dipole components
-                dipole_dat = self.MolecularInfo_obj.DipoleMomentSurface[
-                             f"{self.MolecularInfo_obj.MoleculeName.lower()}_{tor_degrees[i]:0>3}.log"]
+                dipole_dat = self.MolecularInfo_obj.DipoleMomentSurface  # watch this
                 new_dipole_dat = dipole_dat[:, :4]
                 # DipoleMomentSurface also contains rotated coordinates, so we chop those off.
                 new_dipole_dat[:, 0] = Constants.convert(new_dipole_dat[:, 0], "angstroms", to_AU=True)
