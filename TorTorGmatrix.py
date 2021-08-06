@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import interpolate
 from Converter import Constants
+import matplotlib.pyplot as plt
 
 
 class TorTorGmatrix:
@@ -8,7 +9,9 @@ class TorTorGmatrix:
         self.GmatCoords = MoleculeObj.GmatCoords
         self.massarray = MoleculeObj.mass_array
         self.tor1key = np.unique([k[0] for k in self.GmatCoords.keys()])
+        self.tor1rad = np.radians(self.tor1key)
         self.tor2key = np.unique([k[1] for k in self.GmatCoords.keys()])
+        self.tor2rad = np.radians(self.tor2key)
         self._GHdpHdp = None
         self._GXX = None
         self._GXHdp = None
@@ -98,8 +101,14 @@ class TorTorGmatrix:
                   'phi234': np.radians(self.GmatCoords[(HOOC, OCCX)]["A4"]),
                   'tau1234': np.radians(self.GmatCoords[(HOOC, OCCX)]["D4"])}
             Ghh[tor1_ind, tor2_ind] = self.calc_Gaa(masses, ic)
-        Ghh_func = interpolate.interp2d(self.tor1key, self.tor2key, Ghh.T, kind="cubic")
+        Ghh_func = interpolate.interp2d(self.tor1rad, self.tor2rad, Ghh.T, kind="cubic")
         # Transpose G because interp2d expects (y,x) matrix
+        # plt.tricontourf(np.array(list(self.GmatCoords.keys()))[:, 0], np.array(list(self.GmatCoords.keys()))[:, 1],
+        #                 Ghh.flatten()/(9.1093837015e-28*6.02214076e23)*1.88973**2)
+        # plt.title("GH''H''")
+        # cbar = plt.colorbar()
+        # cbar.set_label(r"1/amu$\AA^2$")
+        # plt.show()
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])
@@ -172,8 +181,14 @@ class TorTorGmatrix:
     def calc_GXX(self):
         """calculate the G-matrix of the OCCX torsion"""
         GXX = (1/4) * (self.calc_GHH() + self.calc_GHpHp() + self.calc_GHpH())
-        GXX_func = interpolate.interp2d(self.tor1key, self.tor2key, GXX.T, kind="cubic")
+        GXX_func = interpolate.interp2d(self.tor1rad, self.tor2rad, GXX.T, kind="cubic")
         # Transpose G because interp2d expects (y,x) matrix
+        # plt.tricontourf(np.array(list(self.GmatCoords.keys()))[:, 0], np.array(list(self.GmatCoords.keys()))[:, 1],
+        #                 GXX.flatten()/(9.1093837015e-28*6.02214076e23)*1.88973**2)
+        # plt.title("GXX")
+        # cbar = plt.colorbar()
+        # cbar.set_label(r"1/amu$\AA^2$")
+        # plt.show()
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])
@@ -226,8 +241,14 @@ class TorTorGmatrix:
     def calc_GXHdp(self):
         """calculate the cross term for the G-matrix (OCCX with HOOC) (off diagonal)"""
         GXHdp = (1/2) * (self.calc_GHHdp() + self.calc_GHpHdp())
-        GXHdp_func = interpolate.interp2d(self.tor1key, self.tor2key, GXHdp.T, kind="cubic")
+        GXHdp_func = interpolate.interp2d(self.tor1rad, self.tor2rad, GXHdp.T, kind="cubic")
         # Transpose G because interp2d expects (y,x) matrix
+        # plt.tricontourf(np.array(list(self.GmatCoords.keys()))[:, 0], np.array(list(self.GmatCoords.keys()))[:, 1],
+        #                 GXHdp.flatten()/(9.1093837015e-28*6.02214076e23)*1.88973**2)
+        # plt.title("GXH''")
+        # cbar = plt.colorbar()
+        # cbar.set_label(r"1/amu$\AA^2$")
+        # plt.show()
 
         def caller(coords, **deriv_kwargs):
             unx = np.unique(coords[:, 0])
