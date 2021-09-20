@@ -292,9 +292,25 @@ class MolecularResults2D:
             ens_har = Constants.convert(twoD_dat[:, 3], "kcal/mol", to_AU=True)
             # ens_wave = Constants.convert(ens_har, "wavenumbers", to_AU=False)
             hooc = [(x-1)*15 for x in twoD_dat[:, 2]]
+            hooc_shift = [(x+98) % 360 for x in hooc]
+            hooc_2shift = [360 - x for x in hooc_shift]
             occx = [(x-1)*15 for x in twoD_dat[:, 0]]
-            pot = np.column_stack((hooc, occx, ens_har))
+            occx_shift = [(x+25) % 360 for x in occx]
+            occx_2shift = [360 - x for x in occx_shift]
+            # pot = np.column_stack((np.radians(hooc_2shift), np.radians(occx_2shift), ens_har))
+            stack1 = np.column_stack((hooc_2shift, occx_2shift, ens_har))
+            smol_args = np.argwhere(stack1[:, 1] < 180).flatten()
+            onehalf = stack1[smol_args]
+            big_args = np.argwhere(stack1[:, 1] > 180).flatten()
+            twohalf = stack1[big_args]
+            avg_energies = (onehalf[:, 2] + twohalf[:, 2]) / 2
+            pothalf = np.column_stack((np.radians(onehalf[:, 0]), np.radians(onehalf[:, 1]), avg_energies))
+            pot = np.vstack((pothalf, np.column_stack((pothalf[:, 0], pothalf[:, 1]+np.pi, pothalf[:, 2]))))
             sort_ind = np.lexsort((pot[:, 1], pot[:, 0]))
+            # test = pot[sort_ind]
+            # plt.tricontourf(test[:, 0], test[:, 1], test[:, 2], levels=15)
+            # plt.colorbar()
+            # plt.show()
             self._CCSDpot = pot[sort_ind]
         return self._CCSDpot
 
@@ -302,7 +318,7 @@ class MolecularResults2D:
     def OHres(self):
         if self._OHres is None:
             resultspath = os.path.join(self.MoleculeObj.MoleculeDir,
-                                       f"{self.MoleculeObj.MoleculeName}_ODDVR_results_02pi_30.npz")
+                                       f"{self.MoleculeObj.MoleculeName}_OHDVR_results_02pi_30.npz")
             if os.path.exists(resultspath):
                 print(f"Loading {resultspath}... ")
                 self._OHres = np.load(resultspath)
@@ -316,7 +332,7 @@ class MolecularResults2D:
     def ConstGRes(self):
         if self._ConstGRes is None:
             resDict = dict()
-            for i, val in enumerate(['CCSD', 'DFT']):
+            for i, val in enumerate(['CCSD_avg', 'DFT']):
                 resultspath = os.path.join(self.MoleculeDir, f"ConstG_2D_DVR_{val}.npz")
                 if os.path.exists(resultspath):
                     print(f"Loading {resultspath}... ")
@@ -332,15 +348,15 @@ class MolecularResults2D:
     def TwoDdvrRes(self):
         if self._TwoDdvrRes is None:
             resDict = dict()
-            for i, val in enumerate(['electronic', 'VOD_0', 'VOD_1', 'VOD_2', 'VOD_3']):
-                resultspath = os.path.join(self.MoleculeDir, f"FullG_2D_DVR_{val}_symmQOOD.npz")
-                if os.path.exists(resultspath):
-                    print(f"Loading {resultspath}... ")
-                    resDict[val] = np.load(resultspath, allow_pickle=True)
-                else:
-                    print(f"{resultspath} not found. Beginning {val} 2D DVR... ")
-                    res = self.TwoDTorTor_FullG(resultspath, val)
-                    resDict[val] = np.load(res, allow_pickle=True)
+            for i, val in enumerate(['electronic', 'VOH_0', 'VOH_1', 'VOH_2']):
+                resultspath = os.path.join(self.MoleculeDir, f"FullG_2D_DVR_{val}_symm.npz")
+                # if os.path.exists(resultspath):
+                #     print(f"Loading {resultspath}... ")
+                #     resDict[val] = np.load(resultspath, allow_pickle=True)
+                # else:
+                print(f"{resultspath} not found. Beginning {val} 2D DVR... ")
+                res = self.TwoDTorTor_FullG(resultspath, val)
+                resDict[val] = np.load(res, allow_pickle=True)
             self._TwoDdvrRes = resDict
         return self._TwoDdvrRes
 
@@ -396,7 +412,7 @@ class MolecularResults2D:
                                                                      desiredEnergies=params["desired_energies"],
                                                                      NumPts=params["num_pts"],
                                                                      plotPhasedWfns=params["plot_phased_wfns"])
-        npz_name = f"{self.MoleculeObj.MoleculeName}_ODDVR_results_02pi_30.npz"
+        npz_name = f"{self.MoleculeObj.MoleculeName}_OHDVR_results_02pi_30.npz"
         np.savez(os.path.join(self.MoleculeDir, npz_name), potential=potential_array,
                  epsilon=epsilon_pots, wavefunctions=wavefuns_array, data_pts=list(self.MoleculeObj.OHScanDict.keys()))
         # plot_wfns(wavefuns_array, potential_array, list(self.MoleculeObj.OHScanDict.keys()),
@@ -412,7 +428,7 @@ class MolecularResults2D:
         print("Conducting 2D DVR with Constant G")
         gHdpHdp = self.GHdpHdp[0][26, 15]  # calls the calculate g-mat element at the equilibrium geom
         gXX = self.GXX[0][26, 15]
-        if val == "CCSD":
+        if val == "CCSD_avg":
             pot = self.CCSDpot
         elif val == "DFT":
             pot = self.squareCoords
@@ -423,14 +439,17 @@ class MolecularResults2D:
                          domain=((min(pot[:, 0]),  max(pot[:, 0])),
                                  (min(pot[:, 1]), max(pot[:, 1]))),
                          results_class=ResultsInterpreter)
-        res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
-                           plot_style=dict(levels=15)).show()
+        # res.plot_potential(plot_class=ContourPlot, plot_units="wavenumbers", energy_threshold=2000, colorbar=True,
+        #                    plot_style=dict(levels=15)).show()
         dvr_grid = np.degrees(res.grid)
         dvr_pot = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
         all_ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
         print(all_ens)
-        if val == "CCSD":
+        if val == "CCSD_avg":
             save_tmp = os.path.join(self.MoleculeDir, "figures", "2D_CCSD_torwfns", f"{val}_torWfn_")
+            ResultsInterpreter.wfn_contours(res, filename=save_tmp)
+        else:
+            save_tmp = os.path.join(self.MoleculeDir, "figures", "2D_ConstG_torwfns", f"{val}_torWfn_")
             ResultsInterpreter.wfn_contours(res, filename=save_tmp)
         np.savez(resultspath, grid=[dvr_grid], potential=[dvr_pot],
                  energy_array=all_ens, wfns_array=res.wavefunctions.wavefunctions)
@@ -458,6 +477,10 @@ class MolecularResults2D:
         from Converter import Constants
         from McUtils.Plots import ContourPlot
         from scipy import interpolate
+        params = {'text.usetex': False,
+                  'mathtext.fontset': 'dejavusans',
+                  'font.size': 10}
+        plt.rcParams.update(params)
         dvr_2D = DVR("ColbertMillerND")
         print("Conducting 2D DVR with Full G")
         Epot = self.squareCoords
@@ -476,7 +499,7 @@ class MolecularResults2D:
         pot_vals = np.column_stack((self.squareCoords[:, 0], self.squareCoords[:, 1], potential))
         res = dvr_2D.run(potential_grid=pot_vals, flavor="[0,2Pi]",
                          divs=(51, 51), g=[[self.GHdpHdp[1], self.GXHdp[1]], [self.GXHdp[1], self.GXX[1]]],
-                         g_deriv=[self.Gderiv_HdpHdp, self.Gderiv_XX], num_wfns=30,
+                         g_deriv=[self.Gderiv_HdpHdp, self.Gderiv_XX], num_wfns=35,
                          domain=((min(pot_vals[:, 0]),  max(pot_vals[:, 0])),
                                  (min(pot_vals[:, 1]), max(pot_vals[:, 1]))),
                          results_class=ResultsInterpreter)
@@ -493,24 +516,45 @@ class MolecularResults2D:
         sum_wfn = (wfns[:, 0] + wfns[:, 1]) / np.sqrt(2)
         diff_wfn = (wfns[:, 0] - wfns[:, 1]) / np.sqrt(2)
         wfns[:, 0] = sum_wfn
-        # plt.tricontourf(grid_reshape[0].flatten(), grid_reshape[1].flatten(), sum_wfn)
-        # plt.xlabel("HOOC")
-        # plt.ylabel("CH2 Rotation")
-        # plt.title("SUM wfn")
-        # plt.show()
+        fig = plt.figure(figsize=(6, 6), dpi=600)
+        plt.tricontourf(grid_reshape[0].flatten(), grid_reshape[1].flatten(), sum_wfn)
+        plt.xlabel("HOOC")
+        plt.xticks(np.arange(0, 390, 60))
+        plt.ylabel("CH2 Rotation")
+        plt.yticks(np.arange(0, 390, 60))
+        plt.title("0+ Wavefunction")
+        filename = os.path.join(self.MoleculeDir, "figures", "2Dtorwfns", f"{val}_torWfn_sum")
+        fig.savefig(f"{filename}.jpg", dpi=fig.dpi, bbox_inches="tight")
         wfns[:, 1] = diff_wfn
-        # plt.tricontourf(grid_reshape[0].flatten(), grid_reshape[1].flatten(), diff_wfn)
-        # plt.xlabel("HOOC")
-        # plt.ylabel("CH2 Rotation")
-        # plt.title("DIFF wfn")
-        # plt.show()
+        plt.tricontourf(grid_reshape[0].flatten(), grid_reshape[1].flatten(), diff_wfn)
+        plt.xlabel("HOOC")
+        plt.xticks(np.arange(0, 390, 60))
+        plt.ylabel("CH2 Rotation")
+        plt.xticks(np.arange(0, 390, 60))
+        plt.title("DIFF wfn")
+        filename2 = os.path.join(self.MoleculeDir, "figures", "2Dtorwfns", f"{val}_torWfn_diff")
+        fig.savefig(f"{filename2}.jpg", dpi=fig.dpi, bbox_inches="tight")
         print(val, all_ens)
-        print(min(dvr_pot))
-        save_tmp = os.path.join(self.MoleculeDir, "figures", "2Dtorwfns_QOOD", f"{val}_torWfn_")
+        # print(min(dvr_pot))
+        save_tmp = os.path.join(self.MoleculeDir, "figures", "2Dtorwfns", f"{val}_torWfn_")
         ResultsInterpreter.wfn_contours(res, filename=save_tmp)
         np.savez(resultspath, grid=[dvr_grid], potential=[dvr_pot],
                  energy_array=all_ens, wfns_array=wfns)
         return resultspath
+
+    def calc_probs(self):
+        for val in ['VOH_0', 'VOH_1', 'VOH_2', 'VOH_3']:
+            eigvecs = self.TwoDdvrRes[val]["wfns_array"]
+            pas = np.zeros((len(eigvecs[0]), 2))
+            grid = self.TwoDdvrRes[val]["grid"][0]
+            grid_for_real = np.moveaxis(grid, -1, 0)
+            grrid = grid_for_real[0].flatten()
+            for i in np.arange(len(eigvecs[0])):
+                left_wfn = eigvecs[np.argwhere(grrid < 180), i]
+                pas[i, 0] = (np.dot(left_wfn.T, left_wfn))*100
+                right_wfn = eigvecs[np.argwhere(grrid > 180), i]
+                pas[i, 1] = (np.dot(right_wfn.T, right_wfn))*100
+            print(val, pas)
 
     def TwoD_transitions(self):
         from TransitionMoments2D import TransitionMoments2D
@@ -519,7 +563,7 @@ class MolecularResults2D:
         if self.IntensityType == "FC":
             AllIntensities = tm_obj.calc_intensity(numGstates=2, numEstates=10, FC=True)
         elif self.IntensityType == "TDM":
-            AllIntensities = tm_obj.calc_intensity(numGstates=6, numEstates=19, FC=False)
+            AllIntensities = tm_obj.calc_intensity(numGstates=6, numEstates=30, FC=False)
         else:
             raise Exception(f"Can not compute {self.IntensityType} intensities.")
         return AllIntensities

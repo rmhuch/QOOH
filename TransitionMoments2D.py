@@ -187,7 +187,7 @@ class TransitionMoments2D:
     def fit_TDM(self, TDM):
         """This will tile the TDM so that we can "force" a periodic fit"""
         from scipy import interpolate
-        wfn_grid = self.tortor_results["VOD_0"]["grid"][0]
+        wfn_grid = self.tortor_results["VOH_0"]["grid"][0]
         xnew = np.unique(wfn_grid[:, 0])
         ynew = np.unique(wfn_grid[:, 1])
         currentTDMgrid = np.array(self.OHresults["data_pts"])
@@ -207,10 +207,10 @@ class TransitionMoments2D:
         import csv
         Glevel = int(Tstring[0])
         Exlevel = int(Tstring[-1])
-        gstorWfn = self.tortor_results[f"VOD_{Glevel}"]["wfns_array"]
-        gstorEnergies = self.tortor_results[f"VOD_{Glevel}"]["energy_array"]
-        extorWfn = self.tortor_results[f"VOD_{Exlevel}"]["wfns_array"]
-        extorEnergies = self.tortor_results[f"VOD_{Exlevel}"]["energy_array"]
+        gstorWfn = self.tortor_results[f"VOH_{Glevel}"]["wfns_array"]
+        gstorEnergies = self.tortor_results[f"VOH_{Glevel}"]["energy_array"]
+        extorWfn = self.tortor_results[f"VOH_{Exlevel}"]["wfns_array"]
+        extorEnergies = self.tortor_results[f"VOH_{Exlevel}"]["energy_array"]
         intensities = []
         TDM = self.calc_TDM(Tstring)
         fit_TDM = self.fit_TDM(TDM)
@@ -222,15 +222,16 @@ class TransitionMoments2D:
                 for exState in np.arange(numEstates):
                     freq = extorEnergies[exState] - gstorEnergies[gState]  # already in wavenumbers
                     matEl = np.zeros(3)
+                    matEl_D = np.zeros(3)
                     comp_intents = np.zeros(3)
                     for c, val in enumerate(["A", "B", "C"]):  # loop through components
-                        TDM_D = fit_TDM[c, :, :] / 0.393456
-                        matEl[c] = (np.dot(gstorWfn[:, gState], (TDM_D.flatten() * extorWfn[:, exState])))**2
+                        matEl[c] = (np.dot(gstorWfn[:, gState], (fit_TDM[c, :, :].flatten() * extorWfn[:, exState])))**2
+                        matEl_D[c] = matEl[c] / 0.393456
                         comp_intents[c] = matEl[c] * freq * 2.506 / (0.393456 ** 2)
                     intensity = np.sum(comp_intents)
                     Ei = gstorEnergies[gState]-gstorEnergies[0]
                     intensities.append([gState, exState, freq, intensity])
-                    results_writer.writerow([gState, exState, Ei, freq, *matEl, intensity])
+                    results_writer.writerow([gState, exState, Ei, freq, *matEl_D, intensity])
         return intensities  # ordered dict keyed by transition, holding a list of all the tor transitions
 
     # calculate overlap of torsion wfns with TDM
@@ -246,7 +247,7 @@ class TransitionMoments2D:
                 print(f"2D FC Energies/Wavefunctions saved to {filename}")
                 all_intensities[Tstring] = self.easyFC(filename, Tstring, numGstates, numEstates)
             else:
-                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2DTDM_symmQOOD.csv"
+                filename = f"TransitionIntensities_vOH{Glevel}tovOH{Exlevel}_2DTDM_symmTDMtestAA.csv"
                 print(f"2D TDM Energies/Wavefunctions saved to {filename}")
                 all_intensities[Tstring] = self.calc_TDM_intensity(filename, Tstring, numGstates, numEstates)
         return all_intensities

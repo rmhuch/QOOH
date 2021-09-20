@@ -24,7 +24,7 @@ qooh = MoleculeInfo(MoleculeName="QOOH",
 
 qooh_res_obj = MoleculeResults(MoleculeInfo_obj=qooh,
                                DVRparams={"desired_energies": 8,
-                                          "num_pts": 2000,
+                                          "num_pts": 1000,
                                           "plot_phased_wfns": False,
                                           "extrapolate": 0.3,
                                           "PrintResults": True},
@@ -80,8 +80,8 @@ def make_Vel_plots(mol_res_obj):
 
 if __name__ == '__main__':
     # run_pot_plots()
-    print(qooh.eqPES)
-    # a = qooh_res_obj.TransitionIntensities
+    # print(qooh.eqPES)
+    a = qooh_res_obj.run_gmatrix()
     # make_Vel_plots(qooh_res_obj)
     # energy = calc_curves(np.radians(np.arange(0, 360, 1)), qooh_res_obj.VelCoeffs, function="fourier")
     # energy_dat = np.column_stack((np.arange(0, 360, 1), energy))

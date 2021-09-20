@@ -266,7 +266,7 @@ class MoleculeResults:
         from Gmatrix import get_tor_gmatrix, get_eq_g, make_gmat_plot
         Epot_array = self.MoleculeInfo.eqPES
         if type(Epot_array) == list:
-            Epot_array = Epot_array[0]  # use the first eq point
+            Epot_array = Epot_array[1]  # use QOOH1 point
         else:
             pass
         params = self.DVRparams

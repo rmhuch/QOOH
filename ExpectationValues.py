@@ -18,7 +18,9 @@ def run_DVR(Epot_array, extrapolate=0, NumPts=1000, desiredEnergies=3):
     ens = Constants.convert(res.wavefunctions.energies, "wavenumbers", to_AU=False)
     energies_array = ens  # wavenumbers
     wavefunctions_array = np.column_stack((res.grid, res.wavefunctions.wavefunctions))  # bohr
-    # np.savetxt("EqTOR_OHwfns_forCoire.dat", wavefunctions_array)
+    # np.savetxt("QOOH1_OHwfns_forCoire.dat", wavefunctions_array)
+    pot_array = np.column_stack((res.grid, res.potential_energy.diagonal()))
+    # np.savetxt("QOOH1_potential_forCoire.dat", pot_array)
     return energies_array, wavefunctions_array
 
 def calc_expectation(dvr_wavefunctions):

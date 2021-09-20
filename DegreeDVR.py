@@ -56,9 +56,9 @@ def run_2D_OHDVR(data_dict, NumPts=1000, desiredEnergies=3, plotPhasedWfns=False
     wavefunctions_array = np.zeros((len(data_dict), NumPts, desiredEnergies))
     mO = Constants.mass("O", to_AU=True)
     mH = Constants.mass("H", to_AU=True)
-    mD = Constants.mass("D", to_AU=True)
     muOH = 1 / (1 / mO + 1 / mH)
-    muOD = 1 / (1 / mO + 1 / mD)
+    # mD = Constants.mass("D", to_AU=True)
+    # muOD = 1 / (1 / mO + 1 / mD)
     # we will run dvr over the SAME grid (0.7, 1.5 A) for all OH cuts for uniformity
     domain_max = Constants.convert(1.5, "angstroms", to_AU=True)
     domain_min = Constants.convert(0.7, "angstroms", to_AU=True)
@@ -70,7 +70,7 @@ def run_2D_OHDVR(data_dict, NumPts=1000, desiredEnergies=3, plotPhasedWfns=False
             x = Constants.convert(data_dict[n]["B6"], "angstroms", to_AU=True)
             en = data_dict[n]["Energy"] - np.min(data_dict[n]["Energy"])
         # subtract minimum at each cut to eliminate the electronic component since we add later
-        res = dvr_1D.run(potential_function=Potentials1D().potlint(x, en), mass=muOD,
+        res = dvr_1D.run(potential_function=Potentials1D().potlint(x, en), mass=muOH,
                          divs=NumPts, domain=(domain_min, domain_max), num_wfns=desiredEnergies)
         potential = Constants.convert(res.potential_energy.diagonal(), "wavenumbers", to_AU=False)
         grid = Constants.convert(res.grid, "angstroms", to_AU=False)

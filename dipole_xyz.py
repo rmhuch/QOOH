@@ -4,7 +4,7 @@ from McUtils.Data import AtomData, UnitsData
 from McUtils.Plots import Plot
 # inputs I don't know
 dip_dict = qooh.DipoleMomentSurface
-rachel_want_to_view_keys = list(filter(lambda k: k[0] == 360, dip_dict.keys()))
+rachel_want_to_view_keys = list(filter(lambda k: k[0] == 90, dip_dict.keys()))
 qooh_atoms = qooh.atom_array
 qooh_masses = [AtomData[a]["Mass"] * UnitsData.convert("AtomicMassUnits", "ElectronMass") for a in qooh_atoms]
 xyz_save_dir = os.path.join(qooh.MoleculeDir, "DipoleTests")
@@ -26,9 +26,9 @@ def make_an_xyz(atoms, carts_stack):
 for key in rachel_want_to_view_keys:
     carts = dip_dict[key][:, 4:].reshape(len(dip_dict[key]), len(qooh_atoms), 3) / np.sqrt(qooh_masses)[np.newaxis, :, np.newaxis]
     my_xyz_string = make_an_xyz(qooh_atoms, carts)
-    with open(os.path.join(xyz_save_dir, "qooh_{}_{}.xyz".format(key[0], key[1])), "w+") as output_file:
+    with open(os.path.join(xyz_save_dir, "unrot_qooh_{}_{}.xyz".format(key[0], key[1])), "w+") as output_file:
         output_file.write(my_xyz_string)
     my_xyz_ploot = Plot(dip_dict[key][:, 0], dip_dict[key][:, 1])
     Plot(dip_dict[key][:, 0], dip_dict[key][:, 2], figure=my_xyz_ploot)
     Plot(dip_dict[key][:, 0], dip_dict[key][:, 3], figure=my_xyz_ploot)
-    my_xyz_ploot.savefig(os.path.join(xyz_save_dir, "qooh_{}_{}.png".format(key[0], key[1])))
+    my_xyz_ploot.savefig(os.path.join(xyz_save_dir, "unrot_qooh_{}_{}.png".format(key[0], key[1])))
