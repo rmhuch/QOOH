@@ -563,7 +563,7 @@ class MolecularResults2D:
         if self.IntensityType == "FC":
             AllIntensities = tm_obj.calc_intensity(numGstates=2, numEstates=10, FC=True)
         elif self.IntensityType == "TDM":
-            AllIntensities = tm_obj.calc_intensity(numGstates=6, numEstates=30, FC=False)
+            AllIntensities = tm_obj.calc_intensity(numGstates=6, numEstates=35, FC=False)
         else:
             raise Exception(f"Can not compute {self.IntensityType} intensities.")
         return AllIntensities
